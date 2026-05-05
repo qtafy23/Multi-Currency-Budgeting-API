@@ -1,0 +1,43 @@
+version: '3.9'
+
+services:
+  api:
+    build: .
+    container_name: mcb-api-test
+    command: pytest --cov=. --cov-report=html -v
+    volumes:
+      - .:/app
+    environment:
+      - ENV=testing
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/mcb_test
+      - REDIS_URL=redis://redis:6379/1
+    depends_on:
+      - db
+      - redis
+    networks:
+      - mcb-network
+
+  db:
+    image: postgres:16-alpine
+    container_name: mcb-db-test
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=mcb_test
+    volumes:
+      - postgres_test:/var/lib/postgresql/data
+    networks:
+      - mcb-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: mcb-redis-test
+    networks:
+      - mcb-network
+
+volumes:
+  postgres_test:
+
+networks:
+  mcb-network:
+    driver: bridge

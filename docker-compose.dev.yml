@@ -1,0 +1,49 @@
+version: '3.9'
+
+services:
+  api:
+    build: .
+    container_name: mcb-api-dev
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - ENV=development
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/mcb_dev
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+    networks:
+      - mcb-network
+
+  db:
+    image: postgres:16-alpine
+    container_name: mcb-db-dev
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=mcb_dev
+    volumes:
+      - postgres_dev:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - mcb-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: mcb-redis-dev
+    ports:
+      - "6379:6379"
+    networks:
+      - mcb-network
+
+volumes:
+  postgres_dev:
+
+networks:
+  mcb-network:
+    driver: bridge

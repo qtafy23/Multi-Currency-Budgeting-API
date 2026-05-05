@@ -1,0 +1,52 @@
+version: '3.9'
+
+services:
+  api:
+    build: .
+    container_name: mcb-api-prod
+    restart: always
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
+    ports:
+      - "8000:8000"
+    environment:
+      - ENV=production
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+    networks:
+      - mcb-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  db:
+    image: postgres:16-alpine
+    container_name: mcb-db-prod
+    restart: always
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
+    volumes:
+      - postgres_prod:/var/lib/postgresql/data
+    networks:
+      - mcb-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: mcb-redis-prod
+    restart: always
+    networks:
+      - mcb-network
+
+volumes:
+  postgres_prod:
+
+networks:
+  mcb-network:
+    driver: bridge
