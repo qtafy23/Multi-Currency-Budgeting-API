@@ -1,5 +1,3 @@
-import os
-
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config
@@ -9,9 +7,7 @@ from alembic import context
 
 from core.db import Base
 from apps.users.models.users import User
-
-
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@db:5432/mcb_dev")
+from core.config.settings import settings
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -46,7 +42,7 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = config.set_main_option("sqlalchemy.url", DATABASE_URL)
+    url = config.set_main_option("sqlalchemy.url", settings.database_url)
     context.configure(
         url=url,
         target_metadata=target_metadata,
