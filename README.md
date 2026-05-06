@@ -120,6 +120,83 @@ uvicorn main:app --reload
 
 ## Database Migrations
 
+### Auto-Migration System
+
+The project includes an automated migration system that detects model changes and generates migration scripts automatically.
+
+#### Quick Migration Commands
+
+```bash
+# Full auto-migration (generate + apply)
+make migrate
+# or
+python scripts/migrate.py
+
+# Dry run - see what would be migrated
+make migrate-dry
+# or
+python scripts/migrate.py --dry-run
+
+# Generate migration only (don't apply)
+make migrate-generate
+# or
+python scripts/migrate.py --generate-only
+
+# Check migration status
+make db-status
+```
+
+#### Manual Migration (Advanced)
+
+```bash
+# Generate migration manually
+alembic revision --autogenerate -m "Add new table"
+
+# Apply migrations
+alembic upgrade head
+
+# Rollback
+alembic downgrade -1
+
+# View history
+alembic history
+```
+
+#### How Auto-Migration Works
+
+1. **Model Registration**: All models are imported in `apps/__init__.py`
+2. **Change Detection**: Alembic compares current models with database schema
+3. **Script Generation**: Creates migration scripts automatically
+4. **Safe Application**: Applies migrations with rollback capability
+
+#### Adding New Models
+
+When you create new models:
+
+1. Add them to your app's `models/` directory
+2. Import them in `apps/__init__.py`
+3. Run `make migrate` to generate and apply migrations
+
+Example:
+```python
+# apps/your_app/models/new_model.py
+from sqlalchemy import Column, Integer, String
+from core.db import Base
+
+class NewModel(Base):
+    __tablename__ = "new_models"
+    id = Column(Integer, primary_key=True)
+    name = Column(String, nullable=False)
+```
+
+```python
+# apps/__init__.py
+from .users.models import users
+from .your_app.models import new_model  # Add this line
+```
+
+### Manual Migration Commands
+
 ```bash
 # Inside container
 docker-compose -f docker-compose.dev.yml exec api alembic upgrade head
