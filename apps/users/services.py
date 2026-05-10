@@ -117,7 +117,7 @@ class AuthenticationService:
             TokenResponse with access and refresh tokens
         """
         # Token payload
-        token_data = {"sub": user.id, "email": user.email}
+        token_data = {"sub": str(user.id), "email": user.email}
 
         # Create access token
         access_token = create_access_token(token_data)
