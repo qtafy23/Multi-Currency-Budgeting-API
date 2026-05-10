@@ -1,8 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from core.config.settings import settings
+from apps.users.routes import router as auth_router
 
-# Create FastAPI app
+
 app = FastAPI(
     title=settings.app_name,
     description="A comprehensive API for managing multi-currency budgets",
@@ -10,7 +11,6 @@ app = FastAPI(
     debug=settings.debug
 )
 
-# Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
@@ -19,7 +19,8 @@ app.add_middleware(
     allow_headers=settings.cors_headers,
 )
 
-# Health check endpoint
+app.include_router(auth_router, prefix="/api/v1")
+
 @app.get("/health")
 async def health_check():
     return {
@@ -28,7 +29,6 @@ async def health_check():
         "app": settings.app_name
     }
 
-# Welcome endpoint
 @app.get("/")
 async def root():
     return {
