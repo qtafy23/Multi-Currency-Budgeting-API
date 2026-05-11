@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 
 from apps.users.models.users import User
 from apps.users.schemas import UserRegister, UserLogin, TokenResponse
-from apps.users.constants import (
+from core.constants.auth import (
     ACCESS_TOKEN_EXPIRE_SECONDS,
     ERROR_INVALID_CREDENTIALS,
     ERROR_USER_ALREADY_EXISTS,

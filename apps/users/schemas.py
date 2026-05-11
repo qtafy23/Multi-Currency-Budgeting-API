@@ -5,7 +5,7 @@ Provides extensible schemas for registration, login, and token responses.
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 from datetime import datetime
-from apps.users.constants import MIN_PASSWORD_LENGTH
+from core.constants.auth import MIN_PASSWORD_LENGTH
 
 
 class UserRegister(BaseModel):

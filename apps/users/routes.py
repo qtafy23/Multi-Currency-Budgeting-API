@@ -15,7 +15,7 @@ from apps.users.schemas import (
 )
 from apps.users.services import AuthenticationService
 from apps.users.models.users import User
-from apps.users.constants import MSG_LOGOUT_SUCCESSFUL
+from core.constants.auth import MSG_LOGOUT_SUCCESSFUL
 from core.db import SessionLocal
 from core.security import verify_token
 
