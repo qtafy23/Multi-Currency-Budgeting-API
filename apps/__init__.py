@@ -3,3 +3,4 @@
 
 from .users.models import users  # noqa: F401
 from .accounts import models  # noqa: F401
+from .transactions import models  # noqa: F401

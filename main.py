@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from core.config.settings import settings
 from apps.users.routes import router as auth_router
 from apps.accounts.routes import router as accounts_router
+from apps.transactions.routes import router as transactions_router
 
 
 app = FastAPI(
@@ -22,6 +23,7 @@ app.add_middleware(
 
 app.include_router(auth_router, prefix="/api/v1")
 app.include_router(accounts_router, prefix="/api/v1")
+app.include_router(transactions_router, prefix="/api/v1")
 
 @app.get("/health")
 async def health_check():
