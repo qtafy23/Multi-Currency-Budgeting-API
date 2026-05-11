@@ -1,18 +1,14 @@
 from datetime import datetime
 from decimal import Decimal
-from enum import Enum as PyEnum
 from typing import Optional
 
 from pydantic import BaseModel, Field
-
-
-class TransactionType(str, PyEnum):
-    INCOME = "income"
-    EXPENSE = "expense"
+from core.constants.transaction import TransactionType
 
 
 class TransactionCreate(BaseModel):
     account_id: int = Field(..., description="ID of the account to apply the transaction")
+    external_id: str = Field(..., description="Unique external transaction identifier")
     type: TransactionType = Field(..., description="Transaction type: income or expense")
     amount: Decimal = Field(..., gt=0, description="Transaction amount")
     note: Optional[str] = Field(None, description="Optional transaction note")
@@ -21,6 +17,7 @@ class TransactionCreate(BaseModel):
         json_schema_extra = {
             "example": {
                 "account_id": 1,
+                "external_id": "txn_20260511_001",
                 "type": "expense",
                 "amount": 150.00,
                 "note": "Grocery shopping"
@@ -31,6 +28,7 @@ class TransactionCreate(BaseModel):
 class TransactionResponse(BaseModel):
     id: int = Field(..., description="Transaction ID")
     account_id: int = Field(..., description="ID of the account")
+    external_id: Optional[str] = Field(None, description="Unique external transaction identifier")
     type: TransactionType = Field(..., description="Transaction type")
     amount: Decimal = Field(..., description="Transaction amount")
     balance_after: Decimal = Field(..., description="Balance after the transaction")
@@ -44,6 +42,7 @@ class TransactionResponse(BaseModel):
             "example": {
                 "id": 1,
                 "account_id": 1,
+                "external_id": "txn_20260511_001",
                 "type": "income",
                 "amount": 500.00,
                 "balance_after": 1500.00,

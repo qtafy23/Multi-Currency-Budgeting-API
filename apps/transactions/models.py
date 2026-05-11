@@ -1,14 +1,9 @@
-from enum import Enum as PyEnum
 from datetime import datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import Column, Integer, Numeric, String, DateTime, ForeignKey, Enum
 from core.db import Base
-
-
-class TransactionType(str, PyEnum):
-    INCOME = "income"
-    EXPENSE = "expense"
+from core.constants.transaction import TransactionType
 
 
 class Transaction(Base):
@@ -16,6 +11,8 @@ class Transaction(Base):
 
     id = Column(Integer, primary_key=True)
     account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
+    external_id = Column(String, nullable=True, unique=True, index=True)
+    idempotency_key = Column(String, nullable=True, unique=True, index=True)
     type = Column(Enum(TransactionType), nullable=False)
     amount = Column(Numeric(12, 2), nullable=False)
     balance_after = Column(Numeric(12, 2), nullable=False)
