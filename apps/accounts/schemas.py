@@ -2,6 +2,8 @@
 Pydantic schemas for user authentication and data validation.
 Provides extensible schemas for registration, login, and token responses.
 """
+from typing import Optional
+
 from pydantic import BaseModel, Field
 from core.constants.currency import Currency
 
@@ -16,6 +18,22 @@ class AccountCreate(BaseModel):
             "example": {
                 "name": "My Checking Account",
                 "currency": "USD"
+            }
+        }
+
+
+class AccountUpdate(BaseModel):
+    """Schema for updating an existing account."""
+    name: Optional[str] = Field(None, description="Updated account name")
+    currency: Optional[Currency] = Field(None, description="Updated currency code")
+    is_active: Optional[bool] = Field(None, description="Whether the account should remain active")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "name": "Updated Savings",
+                "currency": "EUR",
+                "is_active": True
             }
         }
 
