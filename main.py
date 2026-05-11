@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from core.config.settings import settings
 from apps.users.routes import router as auth_router
+from apps.accounts.routes import router as accounts_router
 
 
 app = FastAPI(
@@ -20,6 +21,7 @@ app.add_middleware(
 )
 
 app.include_router(auth_router, prefix="/api/v1")
+app.include_router(accounts_router, prefix="/api/v1")
 
 @app.get("/health")
 async def health_check():
@@ -47,8 +49,3 @@ if __name__ == "__main__":
         reload=settings.debug,
         workers=settings.workers if not settings.debug else 1
     )
-
-
-@app.get("/items/{item_id}")
-def read_item(item_id: int, q: str | None = None):
-    return {"item_id": item_id, "q": q}
