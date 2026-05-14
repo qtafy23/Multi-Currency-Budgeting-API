@@ -4,6 +4,7 @@ from decimal import Decimal
 from sqlalchemy import Column, Integer, Numeric, String, DateTime, ForeignKey, Enum
 from core.db import Base
 from core.constants.transaction import TransactionType
+from core.constants.currency import Currency
 
 
 class Transaction(Base):
@@ -14,6 +15,10 @@ class Transaction(Base):
     external_id = Column(String, nullable=True, unique=True, index=True)
     idempotency_key = Column(String, nullable=True, unique=True, index=True)
     type = Column(Enum(TransactionType), nullable=False)
+    original_amount = Column(Numeric(12, 2), nullable=True)
+    converted_amount = Column(Numeric(12, 2), nullable=True)
+    original_currency = Column(Enum(Currency), nullable=True)
+    account_currency = Column(Enum(Currency), nullable=True)
     amount = Column(Numeric(12, 2), nullable=False)
     balance_after = Column(Numeric(12, 2), nullable=False)
     currency = Column(String, nullable=False)

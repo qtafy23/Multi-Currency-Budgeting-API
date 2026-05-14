@@ -1,13 +1,18 @@
+import logging
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, Tuple
 
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+logger = logging.getLogger(__name__)
+
 from apps.accounts.models import Account
+from apps.exchange.services import ExchangeRateService
 from apps.transactions.models import Transaction
 from apps.transactions.schemas import TransactionCreate
+from core.constants.currency import Currency
 from core.constants.transaction import TransactionType
 
 
@@ -82,12 +87,12 @@ class TransactionService:
         payload: TransactionCreate,
         user_id: int,
         idempotency_key: Optional[str]
-    ) -> Transaction:
+    ) -> Tuple[Transaction, bool]:
         """
         Create a transaction with idempotent handling and balance update.
         Uses database transaction to ensure atomicity.
+        Returns the transaction and a boolean flag indicating if it was newly created.
         """
-        # Check for existing idempotent transaction
         existing = TransactionService.find_idempotent_transaction(
             db,
             user_id,
@@ -95,7 +100,13 @@ class TransactionService:
             idempotency_key
         )
         if existing:
-            return existing
+            logger.debug(
+                "Idempotency hit: user_id=%s external_id=%s idempotency_key=%s",
+                user_id,
+                payload.external_id,
+                idempotency_key
+            )
+            return existing, False
 
         try:
             account = TransactionService.get_user_account(
@@ -108,10 +119,29 @@ class TransactionService:
                 str(account.balance)
             ) if account.balance is not None else Decimal("0")
 
+            original_amount = Decimal(str(payload.amount))
+            converted_amount = original_amount
+            account_currency = Currency(account.currency)
+
+            if payload.currency != account.currency:
+                converted_amount = ExchangeRateService.convert_amount(
+                    db,
+                    payload.currency,
+                    account_currency,
+                    original_amount
+                )
+
             new_balance = TransactionService.calculate_new_balance(
                 current_balance,
                 payload.type,
-                Decimal(payload.amount)
+                converted_amount
+            )
+
+            logger.debug(
+                "Transaction calculation: account_id=%s before=%s after=%s",
+                account.id,
+                current_balance,
+                new_balance
             )
 
             account.balance = new_balance
@@ -121,7 +151,11 @@ class TransactionService:
                 external_id=payload.external_id,
                 idempotency_key=idempotency_key,
                 type=payload.type,
-                amount=payload.amount,
+                original_amount=original_amount,
+                converted_amount=converted_amount,
+                original_currency=payload.currency,
+                account_currency=account_currency,
+                amount=converted_amount,
                 balance_after=new_balance,
                 currency=account.currency,
                 note=payload.note,
@@ -131,12 +165,16 @@ class TransactionService:
             db.commit()
             db.refresh(transaction)
 
-            return transaction
+            logger.debug(
+                "Created transaction: id=%s account_id=%s amount=%s",
+                transaction.id,
+                transaction.account_id,
+                transaction.amount
+            )
+            return transaction, True
 
         except IntegrityError:
             db.rollback()
-
-            # Retry finding the existing transaction after rollback
             existing = TransactionService.find_idempotent_transaction(
                 db,
                 user_id,
@@ -145,7 +183,13 @@ class TransactionService:
             )
 
             if existing:
-                return existing
+                logger.debug(
+                    "Idempotency conflict resolved by returning existing transaction: user_id=%s external_id=%s idempotency_key=%s",
+                    user_id,
+                    payload.external_id,
+                    idempotency_key
+                )
+                return existing, False
 
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,

@@ -3,14 +3,16 @@ from decimal import Decimal
 from typing import Optional
 
 from pydantic import BaseModel, Field
+from core.constants.currency import Currency
 from core.constants.transaction import TransactionType
 
 
 class TransactionCreate(BaseModel):
     account_id: int = Field(..., description="ID of the account to apply the transaction")
-    external_id: str = Field(..., description="Unique external transaction identifier")
+    external_id: Optional[str] = Field(None, description="Optional external transaction identifier")
     type: TransactionType = Field(..., description="Transaction type: income or expense")
     amount: Decimal = Field(..., gt=0, description="Transaction amount")
+    currency: Currency = Field(..., description="Currency code for the incoming transaction")
     note: Optional[str] = Field(None, description="Optional transaction note")
 
     class Config:
@@ -20,6 +22,7 @@ class TransactionCreate(BaseModel):
                 "external_id": "txn_20260511_001",
                 "type": "expense",
                 "amount": 150.00,
+                "currency": "USD",
                 "note": "Grocery shopping"
             }
         }
@@ -30,9 +33,13 @@ class TransactionResponse(BaseModel):
     account_id: int = Field(..., description="ID of the account")
     external_id: Optional[str] = Field(None, description="Unique external transaction identifier")
     type: TransactionType = Field(..., description="Transaction type")
-    amount: Decimal = Field(..., description="Transaction amount")
+    original_amount: Optional[Decimal] = Field(None, description="Original transaction amount before currency conversion")
+    converted_amount: Optional[Decimal] = Field(None, description="Transaction amount converted into account currency")
+    original_currency: Optional[Currency] = Field(None, description="Original transaction currency")
+    account_currency: Optional[Currency] = Field(None, description="Account currency")
+    amount: Decimal = Field(..., description="Amount applied to the account balance")
     balance_after: Decimal = Field(..., description="Balance after the transaction")
-    currency: str = Field(..., description="Account currency")
+    currency: Currency = Field(..., description="Account currency")
     note: Optional[str] = Field(None, description="Optional transaction note")
     created_at: datetime = Field(..., description="Transaction timestamp")
 
@@ -44,6 +51,10 @@ class TransactionResponse(BaseModel):
                 "account_id": 1,
                 "external_id": "txn_20260511_001",
                 "type": "income",
+                "original_amount": 500.00,
+                "converted_amount": 500.00,
+                "original_currency": "USD",
+                "account_currency": "USD",
                 "amount": 500.00,
                 "balance_after": 1500.00,
                 "currency": "USD",

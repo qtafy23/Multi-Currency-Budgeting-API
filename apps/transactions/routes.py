@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from apps.transactions.schemas import TransactionCreate, TransactionResponse
@@ -14,17 +14,20 @@ router = APIRouter(prefix="/transactions", tags=["Transactions"])
 @router.post("/", response_model=TransactionResponse, status_code=status.HTTP_201_CREATED)
 def create_transaction(
     payload: TransactionCreate,
+    response: Response,
     idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ) -> TransactionResponse:
     """Create a transaction and update the account balance."""
-    transaction = TransactionService.create_transaction(
+    transaction, created = TransactionService.create_transaction(
         db,
         payload,
         current_user.id,
         idempotency_key
     )
+    if not created:
+        response.status_code = status.HTTP_200_OK
     return transaction
 
 
