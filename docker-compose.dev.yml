@@ -19,6 +19,20 @@ services:
     networks:
       - mcb-network
 
+  worker:
+    build: .
+    container_name: mcb-celery-worker-dev
+    command: celery -A core.celery_app worker --loglevel=info
+    volumes:
+      - .:/app
+    environment:
+      - ENV=development
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+    networks:
+      - mcb-network
+
   db:
     image: postgres:16-alpine
     container_name: mcb-db-dev

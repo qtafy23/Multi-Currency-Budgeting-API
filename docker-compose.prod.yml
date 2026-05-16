@@ -24,6 +24,19 @@ services:
       retries: 3
       start_period: 40s
 
+  worker:
+    build: .
+    container_name: mcb-celery-worker-prod
+    restart: always
+    command: celery -A core.celery_app worker --loglevel=info
+    environment:
+      - ENV=production
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+    networks:
+      - mcb-network
+
   db:
     image: postgres:16-alpine
     container_name: mcb-db-prod
