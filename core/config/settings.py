@@ -29,6 +29,20 @@ class Settings(BaseSettings):
     # Redis Settings
     redis_url: str = Field(default="redis://localhost:6379/0", env="REDIS_URL")
 
+    # CurrencyLayer API Settings
+    currencylayer_api_key: str = Field(
+        default="",
+        env="CURRENCYLAYER_API_KEY"
+    )
+    currencylayer_base_url: str = Field(
+        default="https://api.currencylayer.com",
+        env="CURRENCYLAYER_BASE_URL"
+    )
+    exchange_rate_update_interval_minutes: int = Field(
+        default=60,
+        env="EXCHANGE_RATE_UPDATE_INTERVAL_MINUTES"
+    )
+
     # Security Settings
     secret_key: str = Field(
         default="your-secret-key-change-in-production",
