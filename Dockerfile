@@ -8,6 +8,9 @@ RUN apt-get update && apt-get install -y \
     postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
+# Create a non-root runtime user for better container security
+RUN groupadd --system app && useradd --system --gid app --home-dir /app --create-home app
+
 # Copy requirements
 COPY requirements.txt .
 
@@ -16,6 +19,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy project
 COPY . .
+RUN chown -R app:app /app
+
+# Run as a non-root user
+USER app
 
 # Expose port
 EXPOSE 8000
