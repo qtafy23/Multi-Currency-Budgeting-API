@@ -7,13 +7,13 @@ from sqlalchemy.orm import Session
 
 from apps.accounts.models import Account
 from apps.budgets.models import Budget
-from apps.users.models.users import User
+from apps.users.models import User
 from core.config.settings import settings
 from core.constants.budgets import BudgetPeriod
 from core.db.db import SessionLocal
 
 
-DEMO_EMAIL = "demo@example.test"
+DEMO_EMAIL = "demo@example.com"
 DEMO_PASSWORD = "dev-only-password"
 
 ACCOUNTS = (

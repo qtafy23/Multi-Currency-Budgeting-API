@@ -2,8 +2,10 @@
 Authentication API routes.
 Provides endpoints for user registration, login, token refresh, and user information.
 """
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, Form, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from apps.users.schemas import (
@@ -14,14 +16,22 @@ from apps.users.schemas import (
     RefreshTokenRequest
 )
 from apps.users.services import AuthenticationService
-from apps.users.models.users import User
+from apps.users.models import User
 from core.constants.auth import MSG_LOGOUT_SUCCESSFUL
 from core.db import SessionLocal
 from core.security import verify_token
 
 
-router = APIRouter(prefix="/auth", tags=["authentication"])
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+router = APIRouter(prefix="/auth", tags=["Authentication"])
+oauth2_scheme = HTTPBearer(scheme_name="Bearer token")
+
+
+def login_form(
+    email: Annotated[str, Form(..., description="User email address")],
+    password: Annotated[str, Form(..., description="User password")],
+) -> dict[str, str]:
+    """Accept email/password fields in the login form used by Swagger and clients."""
+    return {"email": email, "password": password}
 
 
 def get_db() -> Session:
@@ -34,7 +44,7 @@ def get_db() -> Session:
 
 
 def get_current_user(
-    token: str = Depends(oauth2_scheme),
+    credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme),
     db: Session = Depends(get_db)
 ) -> User:
     """
@@ -51,7 +61,7 @@ def get_current_user(
     Raises:
         HTTPException: If token is invalid or user not found
     """
-    user = AuthenticationService.get_user_by_token(db, token)
+    user = AuthenticationService.get_user_by_token(db, credentials.credentials)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -91,14 +101,14 @@ def register(
 
 @router.post("/login", response_model=TokenResponse)
 def login(
-    form_data: OAuth2PasswordRequestForm = Depends(),
+    form_data: Annotated[dict[str, str], Depends(login_form)],
     db: Session = Depends(get_db)
 ) -> TokenResponse:
     """
     User login endpoint.
 
     Args:
-        form_data: OAuth2 form data containing username(email) and password
+        form_data: Form data containing email and password.
         db: Database session
 
     Returns:
@@ -108,7 +118,7 @@ def login(
         HTTPException: If credentials are invalid
     """
     try:
-        credentials = UserLogin(email=form_data.username, password=form_data.password)
+        credentials = UserLogin(email=form_data["email"], password=form_data["password"])
         user, _ = AuthenticationService.login_user(db, credentials)
         tokens = AuthenticationService.create_tokens(user, include_refresh=True)
         return tokens
