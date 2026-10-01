@@ -5,6 +5,7 @@ from apps.users.routes import router as auth_router
 from apps.accounts.routes import router as accounts_router
 from apps.transactions.routes import router as transactions_router
 from apps.exchange.routes import router as exchange_rates_router
+from apps.budgets.routes import router as budgets_router
 
 
 app = FastAPI(
@@ -26,6 +27,7 @@ app.include_router(auth_router, prefix="/api/v1")
 app.include_router(accounts_router, prefix="/api/v1")
 app.include_router(transactions_router, prefix="/api/v1")
 app.include_router(exchange_rates_router, prefix="/api/v1")
+app.include_router(budgets_router, prefix="/api/v1")
 
 @app.get("/health")
 async def health_check():

@@ -1,19 +1,8 @@
 # Development Commands
-.PHONY: migrate migrate-dry migrate-generate db-status
+.PHONY: db-status dev test lint format docker-dev docker-test docker-prod
 
 # Database migration commands
-migrate:
-	@echo "Running database migrations..."
-	python scripts/migrate.py
-
-migrate-dry:
-	@echo "Dry run - showing what would be migrated..."
-	python scripts/migrate.py --dry-run
-
-migrate-generate:
-	@echo "Generating migration (without applying)..."
-	python scripts/migrate.py --generate-only
-
+# Use standard Alembic commands for migration generation and application.
 db-status:
 	@echo "Checking database migration status..."
 	alembic current

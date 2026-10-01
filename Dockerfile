@@ -1,4 +1,4 @@
-FROM python:3.12-slim
+FROM python:3.12-slim AS runtime
 
 WORKDIR /app
 
@@ -29,3 +29,10 @@ EXPOSE 8000
 
 # Default command (can be overridden)
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+FROM runtime AS development
+
+USER root
+COPY requirements-dev.txt .
+RUN pip install --no-cache-dir -r requirements-dev.txt
+USER app

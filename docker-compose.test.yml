@@ -1,12 +1,56 @@
-version: '3.9'
-
 services:
   api:
-    build: .
+    build:
+      context: .
+      target: development
     container_name: mcb-api-test
     command: pytest --cov=. --cov-report=html -v
     volumes:
       - .:/app
+    ports:
+      - "8001:8000"
+    env_file:
+      - .env
+    environment:
+      - ENV=testing
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/mcb_test
+      - REDIS_URL=redis://redis:6379/1
+    depends_on:
+      - db
+      - redis
+    networks:
+      - mcb-network
+
+  worker:
+    build:
+      context: .
+      target: development
+    container_name: mcb-celery-worker-test
+    command: celery -A core.celery_app worker --loglevel=debug
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    environment:
+      - ENV=testing
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/mcb_test
+      - REDIS_URL=redis://redis:6379/1
+    depends_on:
+      - db
+      - redis
+    networks:
+      - mcb-network
+
+  beat:
+    build:
+      context: .
+      target: development
+    container_name: mcb-celery-beat-test
+    command: celery -A core.celery_app beat --loglevel=debug
+    volumes:
+      - .:/app
+    env_file:
+      - .env
     environment:
       - ENV=testing
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/mcb_test
