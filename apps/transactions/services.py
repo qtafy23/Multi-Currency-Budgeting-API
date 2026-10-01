@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger(__name__)
 
 from apps.accounts.models import Account
+from apps.budgets.services import BudgetService
 from apps.exchange.services import ExchangeRateService
 from apps.transactions.models import Transaction
 from apps.transactions.schemas import TransactionCreate
@@ -131,6 +132,15 @@ class TransactionService:
                     original_amount
                 )
 
+            budget_warning = None
+            if payload.type == TransactionType.EXPENSE and payload.category:
+                budget_warning = BudgetService.update_budget_spent_amount(
+                    user_id,
+                    payload.category,
+                    converted_amount,
+                    db
+                )
+
             new_balance = TransactionService.calculate_new_balance(
                 current_balance,
                 payload.type,
@@ -158,8 +168,11 @@ class TransactionService:
                 amount=converted_amount,
                 balance_after=new_balance,
                 currency=account.currency,
+                category=payload.category,
                 note=payload.note,
             )
+            if budget_warning:
+                transaction.budget_warning = budget_warning
 
             db.add(transaction)
             db.commit()

@@ -5,3 +5,4 @@ from .users.models import users  # noqa: F401
 from .accounts import models  # noqa: F401
 from .transactions import models  # noqa: F401
 from .exchange import models  # noqa: F401
+from .budgets import models  # noqa: F401

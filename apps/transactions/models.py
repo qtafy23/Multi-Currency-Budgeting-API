@@ -22,6 +22,7 @@ class Transaction(Base):
     amount = Column(Numeric(12, 2), nullable=False)
     balance_after = Column(Numeric(12, 2), nullable=False)
     currency = Column(String, nullable=False)
+    category = Column(String, nullable=True, index=True)
     note = Column(String, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 

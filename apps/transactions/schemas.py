@@ -13,6 +13,7 @@ class TransactionCreate(BaseModel):
     type: TransactionType = Field(..., description="Transaction type: income or expense")
     amount: Decimal = Field(..., gt=0, description="Transaction amount")
     currency: Currency = Field(..., description="Currency code for the incoming transaction")
+    category: Optional[str] = Field(None, description="Optional budget category for expense tracking")
     note: Optional[str] = Field(None, description="Optional transaction note")
 
     class Config:
@@ -40,8 +41,10 @@ class TransactionResponse(BaseModel):
     amount: Decimal = Field(..., description="Amount applied to the account balance")
     balance_after: Decimal = Field(..., description="Balance after the transaction")
     currency: Currency = Field(..., description="Account currency")
+    category: Optional[str] = Field(None, description="Budget category for the transaction")
     note: Optional[str] = Field(None, description="Optional transaction note")
     created_at: datetime = Field(..., description="Transaction timestamp")
+    budget_warning: Optional[str] = Field(None, description="Optional warning when a category budget is exceeded")
 
     class Config:
         from_attributes = True
@@ -58,7 +61,9 @@ class TransactionResponse(BaseModel):
                 "amount": 500.00,
                 "balance_after": 1500.00,
                 "currency": "USD",
+                "category": "groceries",
                 "note": "Salary",
+                "budget_warning": "Budget limit exceeded for category 'groceries'",
                 "created_at": "2026-05-11T12:34:56Z"
             }
         }
