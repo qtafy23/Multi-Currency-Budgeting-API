@@ -36,8 +36,10 @@ docker-compose -f docker-compose.dev.yml down
 
 ### Testing Environment
 
-The test stack uses its own PostgreSQL database and volume. Pytest fixtures use a fresh
-in-memory SQLite database per test, so tests cannot read or modify dev/production data.
+`pytest` automatically discovers and loads `tests/conftest.py` for every test run. The shared
+fixtures defined there (`db_session` and `client`) are used by the API tests to create a fresh
+in-memory SQLite database per test and override the application database dependency, so the tests
+cannot read or modify dev/production data.
 
 ```bash
 # Run tests with coverage
@@ -45,6 +47,12 @@ docker-compose -f docker-compose.test.yml up
 
 # View coverage report
 # Check htmlcov/index.html after tests complete
+```
+
+If you want to run a single test file directly in the Docker test container:
+
+```bash
+docker-compose -f docker-compose.test.yml run --rm api python -m pytest tests/test_auth_and_account_ownership.py -q
 ```
 
 To add demo records to the test database manually, apply migrations first and then run:

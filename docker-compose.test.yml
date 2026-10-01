@@ -4,7 +4,7 @@ services:
       context: .
       target: development
     container_name: mcb-api-test
-    command: pytest --cov=. --cov-report=html -v
+    command: python -m pytest --cov=. --cov-report=html -v
     volumes:
       - .:/app
     ports:
@@ -12,6 +12,7 @@ services:
     env_file:
       - .env
     environment:
+      - PYTHONPATH=/app
       - ENV=testing
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/mcb_test
       - REDIS_URL=redis://redis:6379/1
