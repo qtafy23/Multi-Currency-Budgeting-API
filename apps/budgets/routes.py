@@ -40,6 +40,15 @@ def list_budgets(
     return BudgetService.get_user_budgets(current_user.id, db)
 
 
+@router.get("/statistics", response_model=BudgetStatisticsResponse)
+def budget_statistics(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> BudgetStatisticsResponse:
+    stats = BudgetService.get_budget_statistics(current_user.id, db)
+    return BudgetStatisticsResponse(**stats)
+
+
 @router.get("/{budget_id}", response_model=BudgetResponse)
 def get_budget(
     budget_id: int,
@@ -72,15 +81,6 @@ def delete_budget(
 ) -> dict:
     BudgetService.delete_budget(current_user.id, budget_id, db)
     return {"detail": "Budget deleted successfully"}
-
-
-@router.get("/statistics", response_model=BudgetStatisticsResponse)
-def budget_statistics(
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-) -> BudgetStatisticsResponse:
-    stats = BudgetService.get_budget_statistics(current_user.id, db)
-    return BudgetStatisticsResponse(**stats)
 
 
 @router.post("/check", response_model=List[BudgetCheckResponse])
