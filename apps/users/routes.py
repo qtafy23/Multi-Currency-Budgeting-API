@@ -181,10 +181,12 @@ def get_current_user_info(
 
 
 @router.post("/logout")
-def logout(current_user: User = Depends(get_current_user)) -> dict:
+def logout(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
     """
-    Logout endpoint (client-side token removal).
-    This is a placeholder for potential server-side token blacklisting.
+    Revoke all refresh tokens issued to the authenticated user.
 
     Args:
         current_user: Current authenticated user
@@ -192,4 +194,5 @@ def logout(current_user: User = Depends(get_current_user)) -> dict:
     Returns:
         Success message
     """
+    AuthenticationService.revoke_refresh_tokens(db, current_user)
     return {"message": MSG_LOGOUT_SUCCESSFUL}

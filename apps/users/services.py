@@ -121,16 +121,17 @@ class AuthenticationService:
         Returns:
             TokenResponse with access and refresh tokens
         """
-        # Token payload
         token_data = {"sub": str(user.id), "email": user.email}
-
-        # Create access token
         access_token = create_access_token(token_data)
 
-        # Create refresh token if requested
         refresh_token = None
         if include_refresh:
-            refresh_token = create_refresh_token(token_data)
+            refresh_token = create_refresh_token(
+                {
+                    **token_data,
+                    "refresh_token_version": user.refresh_token_version,
+                }
+            )
 
         return TokenResponse(
             access_token=access_token,
@@ -167,6 +168,11 @@ class AuthenticationService:
         user = db.query(User).filter(User.id == user_id).first()
         if not user or not user.is_active:
             raise ValueError(ERROR_USER_NOT_FOUND)
+        if (
+            payload.get("refresh_token_version", 0)
+            != user.refresh_token_version
+        ):
+            raise ValueError(ERROR_INVALID_TOKEN)
 
         # Create new access token
         token_data = {"sub": user.id, "email": user.email}
@@ -196,6 +202,12 @@ class AuthenticationService:
 
         user = db.query(User).filter(User.id == user_id).first()
         return user if user and user.is_active else None
+
+    @staticmethod
+    def revoke_refresh_tokens(db: Session, user: User) -> None:
+        """Revoke all refresh tokens issued before this logout."""
+        user.refresh_token_version += 1
+        db.commit()
 
     @staticmethod
     def verify_email(db: Session, user: User) -> Tuple[User, str]:

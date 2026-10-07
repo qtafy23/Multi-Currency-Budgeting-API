@@ -188,9 +188,13 @@ DEBUG=True
 DATABASE_URL=postgresql://postgres:postgres@db:5432/mcb_dev
 REDIS_URL=redis://redis:6379/0
 SECRET_KEY=your-secret-key
-ACCESS_TOKEN_EXPIRE_MINUTES=30
+ACCESS_TOKEN_EXPIRE_MINUTES=15
 EXCHANGE_RATE_UPDATE_INTERVAL_MINUTES=60
 ```
+
+Access tokens expire after 15 minutes by default. Logging out revokes all refresh
+tokens for that user; already-issued access tokens remain valid only until their
+short expiration.
 
 ## Database and migrations
 
