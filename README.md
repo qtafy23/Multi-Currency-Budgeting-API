@@ -1,104 +1,186 @@
 # Multi-Currency Budgeting API
 
-## Quick Start with Docker
+A FastAPI-based budgeting service with multi-currency accounting, JWT-based authentication, Celery background tasks, and PostgreSQL/Redis support.
 
-No need to install Python, PostgreSQL, or Redis locally! Everything runs in containers.
+## Overview
 
-### Prerequisites
-- Docker
+This project helps manage:
+
+- users and authentication
+- accounts and balances
+- transactions with currency conversion
+- budgets and category limits
+- periodic exchange-rate refreshes from Frankfurter
+
+## Stack
+
+- Python 3.12+
+- FastAPI
+- SQLAlchemy + Alembic
+- PostgreSQL
+- Redis
+- Celery + Celery Beat
 - Docker Compose
+- pytest
 
-### Development Environment (with hot-reload)
+## Project structure
 
-```bash
-# Start all services
-docker-compose -f docker-compose.dev.yml up -d
-
-# Apply pending database migrations
-docker-compose -f docker-compose.dev.yml exec api alembic upgrade head
-
-# Add repeatable demo data to the development database
-docker-compose -f docker-compose.dev.yml exec api python -m scripts.seed_data
-
-# View logs
-docker-compose -f docker-compose.dev.yml logs -f api
-
-# Stop services
-docker-compose -f docker-compose.dev.yml down
+```text
+.
+├── apps/
+│   ├── accounts/
+│   ├── budgets/
+│   ├── exchange/
+│   ├── transactions/
+│   └── users/
+├── core/
+│   ├── config/
+│   ├── constants/
+│   ├── db/
+│   ├── security/
+│   └── utils/
+├── tests/
+├── alembic/
+├── scripts/
+├── main.py
+├── Dockerfile
+├── docker-compose.dev.yml
+├── docker-compose.test.yml
+├── docker-compose.prod.yml
+├── requirements.txt
+├── requirements-dev.txt
+├── README.md
+├── .env.example
+├── Makefile
+├── alembic.ini
+└── .gitignore
 ```
 
-**Access:**
+## Environment and Compose layout
+
+The project uses separate Compose files in the repository root:
+
+- [docker-compose.dev.yml](docker-compose.dev.yml) — local development with reload
+- [docker-compose.test.yml](docker-compose.test.yml) — isolated testing environment
+- [docker-compose.prod.yml](docker-compose.prod.yml) — production deployment
+
+This keeps the setup explicit and avoids ambiguity when multiple environments exist. Use the file explicitly with `-f`.
+
+## Prerequisites
+
+- Docker and Docker Compose support (`docker compose` is the preferred form)
+- Python 3.12+ for local non-Docker development
+
+> Database and Redis are provided automatically by Docker Compose in the dev/test stack. If you run locally without Docker, define `DATABASE_URL` and `REDIS_URL` in `.env`.
+
+## Environment setup first
+
+Before running the app, create a `.env` file from the example:
+
+```bash
+cp .env.example .env
+```
+
+Then adjust values for your current environment. This is required for app startup, especially in Docker and production settings.
+
+## Quick start
+
+### Development environment
+
+```bash
+docker compose -f docker-compose.dev.yml up -d
+```
+
+If you want to use Makefile shortcuts instead of raw commands:
+
+```bash
+make docker-dev
+```
+Access:
+
 - API: http://localhost:8000
-- Docs: http://localhost:8000/docs
+- Swagger UI: http://localhost:8000/docs
 - ReDoc: http://localhost:8000/redoc
 - PostgreSQL: localhost:5432
 - Redis: localhost:6379
 
-### Testing Environment
-
-`pytest` automatically discovers and loads `tests/conftest.py` for every test run. The shared
-fixtures defined there (`db_session` and `client`) are used by the API tests to create a fresh
-in-memory SQLite database per test and override the application database dependency, so the tests
-cannot read or modify dev/production data.
+Useful commands:
 
 ```bash
-# Run tests with coverage
-docker-compose -f docker-compose.test.yml up
-
-# View coverage report
-# Check htmlcov/index.html after tests complete
+docker compose -f docker-compose.dev.yml logs -f api
+docker compose -f docker-compose.dev.yml exec api alembic upgrade head
+docker compose -f docker-compose.dev.yml exec api python -m scripts.seed_data
+docker compose -f docker-compose.dev.yml down
 ```
 
-If you want to run a single test file directly in the Docker test container:
+### Testing environment
+
+The project uses pytest fixtures from [tests/conftest.py](tests/conftest.py). Shared fixtures create isolated database state per test and override the app DB dependency, so test runs do not mutate development or production data.
+
+For a quick project-level shortcut:
 
 ```bash
-docker-compose -f docker-compose.test.yml run --rm api python -m pytest tests/test_auth_and_account_ownership.py -q
+make docker-test
 ```
 
-To add demo records to the test database manually, apply migrations first and then run:
+Run the full suite:
 
 ```bash
-docker-compose -f docker-compose.test.yml run --rm api alembic upgrade head
-docker-compose -f docker-compose.test.yml run --rm api python -m scripts.seed_data
+docker compose -f docker-compose.test.yml up --build
 ```
 
-The seed is additive and repeatable: existing matching demo records are left unchanged.
-It refuses to run unless `ENV` and the database name match the development or testing
-Compose database. Demo login: `demo@example.test` / `dev-only-password`.
-
-### Production Environment
+Or run tests directly in the test container:
 
 ```bash
-# Create .env file with production values
+docker compose -f docker-compose.test.yml run --rm api python -m pytest -q
+```
+
+Run a specific file:
+
+```bash
+docker compose -f docker-compose.test.yml run --rm api python -m pytest tests/test_exchange_rates.py -q
+docker compose -f docker-compose.test.yml run --rm api python -m pytest tests/test_transactions.py -q
+docker compose -f docker-compose.test.yml run --rm api python -m pytest tests/test_budgets.py -q
+```
+
+### Production environment
+
+Use the same `.env` file creation step first, then start the stack:
+
+```bash
 cp .env.example .env
-# Edit .env with your production settings
+# update values for production
 
-# Start services
-docker-compose -f docker-compose.prod.yml up -d
+docker compose -f docker-compose.prod.yml up -d
 ```
 
-## Configuration
+Or via Makefile:
 
-### Environment Variables
+```bash
+make docker-prod
+```
 
-Settings are loaded from (in priority order):
-1. Environment variables
-2. `.env` file
-3. Default values in `core/config/settings.py`
+## Local development without Docker
 
-### Available Settings
+```bash
+python -m venv .venv
+source .venv/Scripts/activate   # Windows
+# or: source .venv/bin/activate # Linux/macOS
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `ENV` | `development` | Environment: development, testing, production |
-| `DEBUG` | `True` | Enable debug mode |
-| `DATABASE_URL` | PostgreSQL dev | Database connection string |
-| `REDIS_URL` | localhost:6379 | Redis connection string |
-| `SECRET_KEY` | dev key | JWT secret (change in production!) |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | 30 | Token expiration time |
-| `EXCHANGE_RATE_UPDATE_INTERVAL_MINUTES` | 1440 | Interval for periodic exchange rate updates (Celery Beat) |
+pip install -r requirements-dev.txt
+alembic upgrade head
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+```
 
-### Example .env File
+## Environment variables
+
+Settings are loaded in this order:
+
+1. OS environment variables
+2. `.env`
+3. defaults from [core/config/settings.py](core/config/settings.py)
+
+Key variables:
 
 ```env
 ENV=development
@@ -106,256 +188,184 @@ DEBUG=True
 DATABASE_URL=postgresql://postgres:postgres@db:5432/mcb_dev
 REDIS_URL=redis://redis:6379/0
 SECRET_KEY=your-secret-key
+ACCESS_TOKEN_EXPIRE_MINUTES=30
 EXCHANGE_RATE_UPDATE_INTERVAL_MINUTES=60
 ```
 
-## Exchange Rate Integration
+## Database and migrations
 
-### Overview
+The project uses Alembic.
 
-Exchange rates are fetched periodically from the keyless **Frankfurter API** at `https://api.frankfurter.dev/v2/rates` and stored globally for all users. EUR is the base currency; one request retrieves EUR-to-GBP and EUR-to-USD rates, and the remaining directions are derived from those values.
-
-**Supported Currencies:**
-- GBP (British Pound)
-- USD (US Dollar)
-- EUR (Euro)
-
-### Setup
-
-No API key is required. Set `EXCHANGE_RATE_UPDATE_INTERVAL_MINUTES` to configure how often Celery Beat refreshes rates.
-
-### How It Works
-
-1. **Celery Beat Scheduler**: Runs periodic task based on `EXCHANGE_RATE_UPDATE_INTERVAL_MINUTES`
-2. **Exchange Rate Task**: Fetches EUR-based rates from Frankfurter API
-3. **Database Update**: Creates or updates exchange rate records
-4. **Global Access**: All users see identical, system-managed rates
-
-### Frankfurter API Response Format
-
-The API returns exchange rates in this format:
-
-```json
-[
-  {"date": "2026-09-30", "base": "EUR", "quote": "GBP", "rate": 0.85659},
-  {"date": "2026-09-30", "base": "EUR", "quote": "USD", "rate": 1.1354}
-]
-```
-
-The request is `GET https://api.frankfurter.dev/v2/rates?base=EUR&quotes=gbp,usd`. For example, `USD -> GBP` is calculated as `(EUR -> GBP) / (EUR -> USD)`.
-
-### Exchange Rate Pairs
-
-The system maintains the following exchange rate pairs:
-
-- GBP → USD
-- GBP → EUR
-- USD → GBP
-- USD → EUR
-- EUR → GBP
-- EUR → USD
-
-All pairs are automatically created and updated on each refresh cycle.
-
-### Architecture Notes
-
-- **System-Managed**: Exchange rates are read-only to users
-- **API Endpoints**: GET /api/v1/exchange-rates/ (list), GET /api/v1/exchange-rates/{id} (retrieve)
-- **No Manual Changes**: Users cannot create, update, or delete exchange rates
-- **Automatic Refresh**: Celery Beat periodically syncs rates
-- **Transaction Conversion**: Transactions in different currencies use global rates
-
-### Troubleshooting
-
-**Exchange rates not updating:**
-- Verify Redis is running: `docker-compose logs redis`
-- Check Celery Beat logs: `docker-compose logs beat`
-- Check worker logs: `docker-compose logs worker`
-- Confirm API connectivity to `api.frankfurter.dev` from the application container
-
-**Missing currency pairs:**
-- Ensure database has at least one exchange rate record
-- Check worker logs for Frankfurter request or response parsing errors
-- Verify supported currencies are GBP, USD, EUR only
-
-**API Errors:**
-- Check the Frankfurter endpoint and query parameters in worker debug logs
-
-
-
-### API Service
-- FastAPI with Uvicorn
-- Auto-reload on code changes (dev only)
-- Multiple workers (prod only)
-
-### Database Service
-- PostgreSQL 16
-- Persistent volumes for data
-- Separate databases per environment (mcb_dev, mcb_test, mcb_prod)
-
-### Redis Service
-- Redis 7
-- Cache layer
-- Session storage
-
-## Local Development (Without Docker)
-
-If you prefer local development:
-
-```bash
-# Create virtual environment
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements-dev.txt
-
-# Run migrations (if applicable)
-alembic upgrade head
-
-# Start API
-uvicorn main:app --reload
-```
-
-## Database Migrations
-
-The project uses standard Alembic commands for database schema evolution.
-
-### Standard Workflow
-
-1. Generate a migration after model changes:
+Create a migration:
 
 ```bash
 alembic revision --autogenerate -m "Add new table"
 ```
 
-2. Review and edit the generated migration file in `alembic/versions/`.
-
-3. Apply the migration:
+Apply migrations:
 
 ```bash
 alembic upgrade head
 ```
 
-4. Inspect status and history:
+Check status/history:
 
 ```bash
 alembic current
 alembic history --verbose
 ```
 
-### Docker Workflow
+Inside Docker:
 
 ```bash
-docker-compose -f docker-compose.dev.yml exec api alembic upgrade head
+docker compose -f docker-compose.dev.yml exec api alembic upgrade head
 ```
 
-### Adding New Models
+## Demo seed data
 
-When you create new models:
-
-1. Add them to your app's `models/` directory.
-2. Import them in `apps/__init__.py`.
-3. Generate a migration with Alembic:
+The project includes a safe seed script for local dev/test data only.
 
 ```bash
-alembic revision --autogenerate -m "Add new model"
+docker compose -f docker-compose.dev.yml exec api python -m scripts.seed_data
 ```
 
-4. Review and edit the generated migration file in `alembic/versions/`.
-5. Apply the migration:
+Behavior:
+
+- it only works in `development` or `testing` environments
+- it requires the local Compose database name (`mcb_dev` or `mcb_test`)
+- it creates only missing demo records and does not overwrite existing matching data
+- it refuses to run against production or non-local databases
+
+Demo credentials:
+
+- email: `demo@example.com`
+- password: `dev-only-password`
+
+## Exchange-rate integration
+
+Rates are refreshed from the keyless Frankfurter API.
+
+Important details:
+
+- no API key is required
+- the service uses EUR as the base currency
+- the app stores derived pairs globally and reuses them for transaction conversion
+- Celery Beat triggers one refresh at startup; if the periodic entry is already due, it uses
+  that dispatch instead of sending a duplicate. Later refreshes follow
+  `EXCHANGE_RATE_UPDATE_INTERVAL_MINUTES`.
+
+Example request:
+
+```text
+GET https://api.frankfurter.dev/v2/rates?base=EUR&quotes=USD,GBP
+```
+
+The system then derives the remaining pairs from EUR-based rates, for example:
+
+- USD -> GBP is calculated from EUR -> GBP and EUR -> USD
+- all global pair rates are stored in the database
+
+Supported currencies:
+
+- EUR
+- USD
+- GBP
+
+## Authentication and security
+
+The app uses JWT-based authentication with a bearer token flow. Passwords are hashed before storage.
+
+Primary auth endpoints are exposed via FastAPI docs and the application login flow.
+
+## Tests
+
+This project contains service-level and integration-style pytest tests under [tests](tests).
+
+Common commands:
 
 ```bash
-alembic upgrade head
+docker compose -f docker-compose.test.yml run --rm api python -m pytest -q
+docker compose -f docker-compose.test.yml run --rm api python -m pytest tests/test_auth_and_account_ownership.py -q
+docker compose -f docker-compose.test.yml run --rm api python -m pytest tests/test_exchange_rates.py -q
+docker compose -f docker-compose.test.yml run --rm api python -m pytest tests/test_transactions.py -q
+docker compose -f docker-compose.test.yml run --rm api python -m pytest tests/test_budgets.py -q
 ```
 
-Example:
-```python
-# apps/your_app/models/new_model.py
-from sqlalchemy import Column, Integer, String
-from core.db import Base
+Local run without Docker:
 
-class NewModel(Base):
-    __tablename__ = "new_models"
-    id = Column(Integer, primary_key=True)
-    name = Column(String, nullable=False)
-```
-
-```python
-# apps/__init__.py
-from .users.models import users
-from .your_app.models import new_model  # Add this line
-```
-
-## Useful Commands
-
-### View container status
 ```bash
-docker-compose -f docker-compose.dev.yml ps
+pytest -q
 ```
 
-### Access database inside container
+## Useful commands
+
+### Container status
+
 ```bash
-docker-compose -f docker-compose.dev.yml exec db psql -U postgres -d mcb_dev
+docker compose -f docker-compose.dev.yml ps
 ```
 
-### Access Redis CLI
+### Database access
+
 ```bash
-docker-compose -f docker-compose.dev.yml exec redis redis-cli
+docker compose -f docker-compose.dev.yml exec db psql -U postgres -d mcb_dev
+```
+
+### Redis access
+
+```bash
+docker compose -f docker-compose.dev.yml exec redis redis-cli
 ```
 
 ### Rebuild image after dependency changes
+
 ```bash
-docker-compose -f docker-compose.dev.yml build --no-cache
+docker compose -f docker-compose.dev.yml build --no-cache
 ```
 
-### Run a command inside container
+### Drop local DB and restart services
+
 ```bash
-docker-compose -f docker-compose.dev.yml exec api python -m pytest
+docker compose -f docker-compose.dev.yml down -v
+docker compose -f docker-compose.dev.yml up --build
 ```
 
 ## Troubleshooting
 
 ### Port already in use
+
 ```bash
-# On Windows
+# Windows
 netstat -ano | findstr :8000
 taskkill /PID <PID> /F
 
-# On Linux/Mac
+# Linux/macOS
 lsof -i :8000
 kill -9 <PID>
 ```
 
-### Database connection errors
-- Ensure all services are running: `docker-compose -f docker-compose.dev.yml ps`
-- Check logs: `docker-compose -f docker-compose.dev.yml logs db`
+### Database connection issues
 
-### Rebuild everything from scratch
 ```bash
-docker-compose -f docker-compose.dev.yml down -v
-docker-compose -f docker-compose.dev.yml up --build
+docker compose -f docker-compose.dev.yml ps
+docker compose -f docker-compose.dev.yml logs db
 ```
 
-## Architecture
+### Exchange-rate issues
 
+```bash
+docker compose -f docker-compose.dev.yml logs worker
+docker compose -f docker-compose.dev.yml logs beat
 ```
-Multi-Currency Budgeting API
-├── apps/              # Feature modules
-│   ├── users/
-│   ├── accounts/
-│   ├── transactions/
-│   ├── budgets/
-│   ├── exchange/
-│   ├── analytics/
-│   └── audit/
-├── core/              # Core utilities
-│   ├── config/        # Settings management
-│   ├── db/            # Database setup
-│   ├── security/      # Auth & security
-│   └── utils/         # Utilities
-├── api/v1/            # API routes
-├── services/          # Business logic
-├── workers/           # Background jobs
-└── main.py            # Entry point
+
+### Missing dependencies or build issues
+
+```bash
+docker compose -f docker-compose.dev.yml build --no-cache
 ```
+
+## Notes
+
+- the app is designed around explicit environment separation between dev, test, and prod
+- the test environment is isolated from production data by design
+- Celery workers and Beat are part of the normal runtime flow and should be started with the matching Compose file
