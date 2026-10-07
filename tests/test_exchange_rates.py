@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from apps.exchange.models import ExchangeRate
 from apps.exchange.services import ExchangeRateService
-from core.constants.currency import Currency
+from core.constants.currency import Currency, FRANKFURTER_RATES_URL
 
 
 def test_fetch_from_frankfurter_parses_latest_dict_response(monkeypatch):
@@ -11,9 +11,18 @@ def test_fetch_from_frankfurter_parses_latest_dict_response(monkeypatch):
             return None
 
         def json(self):
-            return {"rates": {"USD": 1.1, "GBP": 0.8}, "base": "EUR"}
+            return [
+                {"base": "EUR", "quote": "USD", "rate": 1.1},
+                {"base": "EUR", "quote": "GBP", "rate": 0.8},
+            ]
 
-    monkeypatch.setattr("apps.exchange.services.requests.get", lambda *args, **kwargs: FakeResponse())
+    request = {}
+
+    def fake_get(url, params, timeout):
+        request.update(url=url, params=params, timeout=timeout)
+        return FakeResponse()
+
+    monkeypatch.setattr("apps.exchange.services.requests.get", fake_get)
 
     result = ExchangeRateService.fetch_from_frankfurter(
         Currency.EUR,
@@ -25,9 +34,16 @@ def test_fetch_from_frankfurter_parses_latest_dict_response(monkeypatch):
         "USD": Decimal("1.1"),
         "GBP": Decimal("0.8"),
     }
+    assert request == {
+        "url": FRANKFURTER_RATES_URL,
+        "params": {"base": "EUR", "quotes": "USD,GBP"},
+        "timeout": 5,
+    }
 
 
-def test_refresh_rates_from_frankfurter_updates_and_creates_pairs(db_session, monkeypatch):
+def test_refresh_rates_from_frankfurter_updates_and_creates_pairs(
+    db_session, monkeypatch
+):
     class FakeResponse:
         def raise_for_status(self):
             return None
@@ -35,7 +51,10 @@ def test_refresh_rates_from_frankfurter_updates_and_creates_pairs(db_session, mo
         def json(self):
             return {"rates": {"USD": 1.1, "GBP": 0.8}, "base": "EUR"}
 
-    monkeypatch.setattr("apps.exchange.services.requests.get", lambda *args, **kwargs: FakeResponse())
+    monkeypatch.setattr(
+        "apps.exchange.services.requests.get",
+        lambda *args, **kwargs: FakeResponse(),
+    )
 
     stale = ExchangeRate(
         from_currency=Currency.GBP,
@@ -45,13 +64,19 @@ def test_refresh_rates_from_frankfurter_updates_and_creates_pairs(db_session, mo
     db_session.add(stale)
     db_session.commit()
 
-    updated = ExchangeRateService.refresh_rates_from_frankfurter(db_session, timeout_seconds=5)
+    updated = ExchangeRateService.refresh_rates_from_frankfurter(
+        db_session, timeout_seconds=5
+    )
 
     assert updated == 6
-    pair = db_session.query(ExchangeRate).filter(
-        ExchangeRate.from_currency == Currency.GBP,
-        ExchangeRate.to_currency == Currency.USD,
-    ).one()
+    pair = (
+        db_session.query(ExchangeRate)
+        .filter(
+            ExchangeRate.from_currency == Currency.GBP,
+            ExchangeRate.to_currency == Currency.USD,
+        )
+        .one()
+    )
     assert Decimal(str(pair.rate)) == Decimal("1.375")
     assert db_session.query(ExchangeRate).count() == 6
 
