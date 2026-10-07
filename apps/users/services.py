@@ -1,36 +1,35 @@
 """
 Authentication service layer.
-Handles business logic for user authentication including registration, login, and token management.
+Handles business logic for
+user authentication including registration, login, and token management.
 Can be extended to support email verification, OAuth, 2FA, etc.
 """
-from datetime import timedelta
 from typing import Optional, Tuple
-from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
 
-from apps.users.models.users import User
-from apps.users.schemas import UserRegister, UserLogin, TokenResponse
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from apps.users.models import User
+from apps.users.schemas import TokenResponse, UserLogin, UserRegister
 from core.constants.auth import (
     ACCESS_TOKEN_EXPIRE_SECONDS,
+    ERROR_DB_CONSTRAINT,
     ERROR_INVALID_CREDENTIALS,
+    ERROR_INVALID_TOKEN,
     ERROR_USER_ALREADY_EXISTS,
     ERROR_USER_INACTIVE,
-    ERROR_INVALID_TOKEN,
     ERROR_USER_NOT_FOUND,
-    ERROR_DB_CONSTRAINT,
-    MSG_USER_REGISTERED,
-    MSG_LOGIN_SUCCESSFUL,
     MSG_EMAIL_VERIFIED,
+    MSG_LOGIN_SUCCESSFUL,
     MSG_PASSWORD_CHANGED,
-    TOKEN_TYPE_BEARER
+    MSG_USER_REGISTERED,
+    TOKEN_TYPE_BEARER,
 )
 from core.security import (
-    hash_password,
-    verify_password,
     create_access_token,
     create_refresh_token,
+    get_user_id_from_token,
     verify_token,
-    get_user_id_from_token
 )
 
 
@@ -41,7 +40,9 @@ class AuthenticationService:
     """
 
     @staticmethod
-    def register_user(db: Session, user_data: UserRegister) -> Tuple[User, str]:
+    def register_user(
+        db: Session, user_data: UserRegister
+    ) -> Tuple[User, str]:
         """
         Register a new user.
 
@@ -56,7 +57,9 @@ class AuthenticationService:
             ValueError: If email already exists or validation fails
         """
         # Check if user already exists
-        existing_user = db.query(User).filter(User.email == user_data.email).first()
+        existing_user = (
+            db.query(User).filter(User.email == user_data.email).first()
+        )
         if existing_user:
             raise ValueError(
                 ERROR_USER_ALREADY_EXISTS.format(email=user_data.email)
@@ -105,7 +108,9 @@ class AuthenticationService:
         return user, MSG_LOGIN_SUCCESSFUL
 
     @staticmethod
-    def create_tokens(user: User, include_refresh: bool = True) -> TokenResponse:
+    def create_tokens(
+        user: User, include_refresh: bool = True
+    ) -> TokenResponse:
         """
         Create access and optionally refresh tokens for a user.
 
@@ -131,7 +136,7 @@ class AuthenticationService:
             access_token=access_token,
             refresh_token=refresh_token,
             token_type=TOKEN_TYPE_BEARER,
-            expires_in=ACCESS_TOKEN_EXPIRE_SECONDS
+            expires_in=ACCESS_TOKEN_EXPIRE_SECONDS,
         )
 
     @staticmethod
@@ -170,7 +175,7 @@ class AuthenticationService:
         return TokenResponse(
             access_token=access_token,
             token_type=TOKEN_TYPE_BEARER,
-            expires_in=ACCESS_TOKEN_EXPIRE_SECONDS
+            expires_in=ACCESS_TOKEN_EXPIRE_SECONDS,
         )
 
     @staticmethod
@@ -211,7 +216,9 @@ class AuthenticationService:
         return user, MSG_EMAIL_VERIFIED
 
     @staticmethod
-    def change_password(db: Session, user: User, new_password: str) -> Tuple[User, str]:
+    def change_password(
+        db: Session, user: User, new_password: str
+    ) -> Tuple[User, str]:
         """
         Change user password.
 

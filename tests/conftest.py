@@ -17,7 +17,9 @@ def db_session():
         poolclass=StaticPool,
     )
     Base.metadata.create_all(bind=engine)
-    testing_session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    testing_session = sessionmaker(
+        autocommit=False, autoflush=False, bind=engine
+    )
     session = testing_session()
     try:
         yield session

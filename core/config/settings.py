@@ -1,7 +1,6 @@
-from pydantic_settings import BaseSettings
 from pydantic import Field
-from typing import Optional
-import os
+from pydantic_settings import BaseSettings
+
 
 class Settings(BaseSettings):
     """
@@ -10,7 +9,9 @@ class Settings(BaseSettings):
     """
 
     # App Settings
-    app_name: str = Field(default="Multi-Currency Budgeting API", env="APP_NAME")
+    app_name: str = Field(
+        default="Multi-Currency Budgeting API", env="APP_NAME"
+    )
     env: str = Field(default="development", env="ENV")
     debug: bool = Field(default=True, env="DEBUG")
 
@@ -22,7 +23,7 @@ class Settings(BaseSettings):
     # Database Settings
     database_url: str = Field(
         default="postgresql://postgres:postgres@localhost:5432/mcb_dev",
-        env="DATABASE_URL"
+        env="DATABASE_URL",
     )
     db_echo: bool = Field(default=False, env="DB_ECHO")
 
@@ -36,23 +37,20 @@ class Settings(BaseSettings):
 
     # Security Settings
     secret_key: str = Field(
-        default="your-secret-key-change-in-production",
-        env="SECRET_KEY"
+        default="your-secret-key-change-in-production", env="SECRET_KEY"
     )
     algorithm: str = Field(default="HS256", env="ALGORITHM")
     access_token_expire_minutes: int = Field(
-        default=30,
-        env="ACCESS_TOKEN_EXPIRE_MINUTES"
+        default=30, env="ACCESS_TOKEN_EXPIRE_MINUTES"
     )
     refresh_token_expire_days: int = Field(
-        default=7,
-        env="REFRESH_TOKEN_EXPIRE_DAYS"
+        default=7, env="REFRESH_TOKEN_EXPIRE_DAYS"
     )
 
     # CORS Settings
     cors_origins: list = Field(
         default=["http://localhost:3000", "http://localhost:8000"],
-        env="CORS_ORIGINS"
+        env="CORS_ORIGINS",
     )
     cors_credentials: bool = Field(default=True, env="CORS_CREDENTIALS")
     cors_methods: list = Field(default=["*"], env="CORS_METHODS")
@@ -61,6 +59,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = False
+
 
 # Load settings
 settings = Settings()

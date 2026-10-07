@@ -1,6 +1,7 @@
 """
 Authentication API routes.
-Provides endpoints for user registration, login, token refresh, and user information.
+Provides endpoints for user
+registration, login, token refresh, and user information.
 """
 from typing import Annotated
 
@@ -8,19 +9,17 @@ from fastapi import APIRouter, Depends, Form, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
+from apps.users.models import User
 from apps.users.schemas import (
-    UserRegister,
-    UserLogin,
+    RefreshTokenRequest,
     TokenResponse,
+    UserLogin,
+    UserRegister,
     UserResponse,
-    RefreshTokenRequest
 )
 from apps.users.services import AuthenticationService
-from apps.users.models import User
 from core.constants.auth import MSG_LOGOUT_SUCCESSFUL
 from core.db import SessionLocal
-from core.security import verify_token
-
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 oauth2_scheme = HTTPBearer(scheme_name="Bearer token")
@@ -30,7 +29,10 @@ def login_form(
     email: Annotated[str, Form(..., description="User email address")],
     password: Annotated[str, Form(..., description="User password")],
 ) -> dict[str, str]:
-    """Accept email/password fields in the login form used by Swagger and clients."""
+    """
+    Accept email/password fields
+    in the login form used by Swagger and clients.
+    """
     return {"email": email, "password": password}
 
 
@@ -45,7 +47,7 @@ def get_db() -> Session:
 
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> User:
     """
     Dependency to get current authenticated user from token.
@@ -65,16 +67,19 @@ def get_current_user(
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired token"
+            detail="Invalid or expired token",
         )
 
     return user
 
 
-@router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/register",
+    response_model=UserResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 def register(
-    user_data: UserRegister,
-    db: Session = Depends(get_db)
+    user_data: UserRegister, db: Session = Depends(get_db)
 ) -> UserResponse:
     """
     Register a new user.
@@ -94,15 +99,14 @@ def register(
         return UserResponse.from_orm(user)
     except ValueError as e:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
+            status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
         )
 
 
 @router.post("/login", response_model=TokenResponse)
 def login(
     form_data: Annotated[dict[str, str], Depends(login_form)],
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ) -> TokenResponse:
     """
     User login endpoint.
@@ -118,21 +122,23 @@ def login(
         HTTPException: If credentials are invalid
     """
     try:
-        credentials = UserLogin(email=form_data["email"], password=form_data["password"])
+        credentials = UserLogin(
+            email=form_data["email"], password=form_data["password"]
+        )
         user, _ = AuthenticationService.login_user(db, credentials)
-        tokens = AuthenticationService.create_tokens(user, include_refresh=True)
+        tokens = AuthenticationService.create_tokens(
+            user, include_refresh=True
+        )
         return tokens
     except ValueError as e:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(e)
+            status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e)
         )
 
 
 @router.post("/refresh", response_model=TokenResponse)
 def refresh_token(
-    request: RefreshTokenRequest,
-    db: Session = Depends(get_db)
+    request: RefreshTokenRequest, db: Session = Depends(get_db)
 ) -> TokenResponse:
     """
     Refresh access token using refresh token.
@@ -148,18 +154,19 @@ def refresh_token(
         HTTPException: If refresh token is invalid
     """
     try:
-        tokens = AuthenticationService.refresh_access_token(db, request.refresh_token)
+        tokens = AuthenticationService.refresh_access_token(
+            db, request.refresh_token
+        )
         return tokens
     except ValueError as e:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(e)
+            status_code=status.HTTP_401_UNAUTHORIZED, detail=str(e)
         )
 
 
 @router.get("/me", response_model=UserResponse)
 def get_current_user_info(
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ) -> UserResponse:
     """
     Get current authenticated user information.

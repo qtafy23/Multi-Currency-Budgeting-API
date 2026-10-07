@@ -12,7 +12,11 @@ from core.constants.currency import Currency
 from core.constants.transaction import TransactionType
 
 
-def _create_user_and_account(db_session, email: str = "alice@example.com", balance: Decimal = Decimal("100.00")):
+def _create_user_and_account(
+    db_session,
+    email: str = "alice@example.com",
+    balance: Decimal = Decimal("100.00"),
+):
     user = User(email=email, is_active=True, is_verified=True)
     user.set_password("secret123")
     db_session.add(user)
@@ -41,14 +45,18 @@ def test_create_transaction_updates_balance_and_persists_record(db_session):
         note="Weekly shop",
     )
 
-    transaction, created = TransactionService.create_transaction(db_session, payload, account.user_id, "key-1")
+    transaction, created = TransactionService.create_transaction(
+        db_session, payload, account.user_id, "key-1"
+    )
 
     assert created is True
     assert transaction.amount == Decimal("15.50")
     assert transaction.balance_after == Decimal("84.50")
     assert transaction.currency == Currency.USD.value
     assert db_session.query(Transaction).count() == 1
-    assert db_session.query(Account).get(account.id).balance == Decimal("84.50")
+    assert db_session.query(Account).get(account.id).balance == Decimal(
+        "84.50"
+    )
 
 
 def test_create_transaction_is_idempotent_for_same_key(db_session):
@@ -61,8 +69,12 @@ def test_create_transaction_is_idempotent_for_same_key(db_session):
         category="transport",
     )
 
-    first, created_first = TransactionService.create_transaction(db_session, payload, account.user_id, "same-key")
-    second, created_second = TransactionService.create_transaction(db_session, payload, account.user_id, "same-key")
+    first, created_first = TransactionService.create_transaction(
+        db_session, payload, account.user_id, "same-key"
+    )
+    second, created_second = TransactionService.create_transaction(
+        db_session, payload, account.user_id, "same-key"
+    )
 
     assert created_first is True
     assert created_second is False
@@ -81,7 +93,9 @@ def test_create_transaction_rejects_insufficient_balance(db_session):
     )
 
     with pytest.raises(HTTPException) as exc:
-        TransactionService.create_transaction(db_session, payload, account.user_id, "overdraft-key")
+        TransactionService.create_transaction(
+            db_session, payload, account.user_id, "overdraft-key"
+        )
 
     assert exc.value.status_code == 400
     assert "Insufficient account balance" in str(exc.value.detail)

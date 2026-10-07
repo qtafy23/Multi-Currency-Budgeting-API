@@ -1,14 +1,14 @@
 # apps/users package
 from .models import User
+from .routes import router
 from .schemas import (
-    UserRegister,
-    UserLogin,
-    TokenResponse,
-    UserResponse,
     RefreshTokenRequest,
+    TokenResponse,
+    UserLogin,
+    UserRegister,
+    UserResponse,
 )
 from .services import AuthenticationService
-from .routes import router
 
 __all__ = [
     "User",

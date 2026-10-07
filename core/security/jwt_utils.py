@@ -1,17 +1,20 @@
 """
 JWT token utilities for creating and verifying JWT tokens.
-Provides a clean interface for token operations with support for different token types.
+Provides a clean interface for
+token operations with support for different token types.
 """
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
+
 from jose import JWTError, jwt
+
 from core.config.settings import settings
 
 
 def create_token(
     data: Dict[str, Any],
     expires_delta: Optional[timedelta] = None,
-    token_type: str = "access"
+    token_type: str = "access",
 ) -> str:
     """
     Create a JWT token with the provided data.
@@ -38,20 +41,17 @@ def create_token(
                 minutes=settings.access_token_expire_minutes
             )
 
-    to_encode.update({
-        "exp": expire,
-        "type": token_type
-    })
+    to_encode.update({"exp": expire, "type": token_type})
 
     encoded_jwt = jwt.encode(
-        to_encode,
-        settings.secret_key,
-        algorithm=settings.algorithm
+        to_encode, settings.secret_key, algorithm=settings.algorithm
     )
     return encoded_jwt
 
 
-def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
+def create_access_token(
+    data: Dict[str, Any], expires_delta: Optional[timedelta] = None
+) -> str:
     """
     Create an access token.
 
@@ -78,7 +78,9 @@ def create_refresh_token(data: Dict[str, Any]) -> str:
     return create_token(data, token_type="refresh")
 
 
-def verify_token(token: str, token_type: str = "access") -> Optional[Dict[str, Any]]:
+def verify_token(
+    token: str, token_type: str = "access"
+) -> Optional[Dict[str, Any]]:
     """
     Verify and decode a JWT token.
 
@@ -94,9 +96,7 @@ def verify_token(token: str, token_type: str = "access") -> Optional[Dict[str, A
     """
     try:
         payload = jwt.decode(
-            token,
-            settings.secret_key,
-            algorithms=[settings.algorithm]
+            token, settings.secret_key, algorithms=[settings.algorithm]
         )
 
         # Verify token type matches

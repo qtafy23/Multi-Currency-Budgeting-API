@@ -1,4 +1,13 @@
-from sqlalchemy import Column, Integer, String, Numeric, Boolean, DateTime, ForeignKey
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+)
+
 from core.db import Base
 
 
@@ -7,11 +16,7 @@ class Account(Base):
 
     id = Column(Integer, primary_key=True)
 
-    user_id = Column(
-        Integer,
-        ForeignKey("users.id"),
-        nullable=False
-    )
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
 
     name = Column(String, nullable=False)
 

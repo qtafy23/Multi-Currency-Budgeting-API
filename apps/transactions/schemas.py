@@ -3,17 +3,28 @@ from decimal import Decimal
 from typing import Optional
 
 from pydantic import BaseModel, Field
+
 from core.constants.currency import Currency
 from core.constants.transaction import TransactionType
 
 
 class TransactionCreate(BaseModel):
-    account_id: int = Field(..., description="ID of the account to apply the transaction")
-    external_id: Optional[str] = Field(None, description="Optional external transaction identifier")
-    type: TransactionType = Field(..., description="Transaction type: income or expense")
+    account_id: int = Field(
+        ..., description="ID of the account to apply the transaction"
+    )
+    external_id: Optional[str] = Field(
+        None, description="Optional external transaction identifier"
+    )
+    type: TransactionType = Field(
+        ..., description="Transaction type: income or expense"
+    )
     amount: Decimal = Field(..., gt=0, description="Transaction amount")
-    currency: Currency = Field(..., description="Currency code for the incoming transaction")
-    category: Optional[str] = Field(None, description="Optional budget category for expense tracking")
+    currency: Currency = Field(
+        ..., description="Currency code for the incoming transaction"
+    )
+    category: Optional[str] = Field(
+        None, description="Optional budget category for expense tracking"
+    )
     note: Optional[str] = Field(None, description="Optional transaction note")
 
     class Config:
@@ -24,7 +35,7 @@ class TransactionCreate(BaseModel):
                 "type": "expense",
                 "amount": 150.00,
                 "currency": "USD",
-                "note": "Grocery shopping"
+                "note": "Grocery shopping",
             }
         }
 
@@ -32,19 +43,38 @@ class TransactionCreate(BaseModel):
 class TransactionResponse(BaseModel):
     id: int = Field(..., description="Transaction ID")
     account_id: int = Field(..., description="ID of the account")
-    external_id: Optional[str] = Field(None, description="Unique external transaction identifier")
+    external_id: Optional[str] = Field(
+        None, description="Unique external transaction identifier"
+    )
     type: TransactionType = Field(..., description="Transaction type")
-    original_amount: Optional[Decimal] = Field(None, description="Original transaction amount before currency conversion")
-    converted_amount: Optional[Decimal] = Field(None, description="Transaction amount converted into account currency")
-    original_currency: Optional[Currency] = Field(None, description="Original transaction currency")
-    account_currency: Optional[Currency] = Field(None, description="Account currency")
-    amount: Decimal = Field(..., description="Amount applied to the account balance")
-    balance_after: Decimal = Field(..., description="Balance after the transaction")
+    original_amount: Optional[Decimal] = Field(
+        None,
+        description="Original transaction amount before currency conversion",
+    )
+    converted_amount: Optional[Decimal] = Field(
+        None, description="Transaction amount converted into account currency"
+    )
+    original_currency: Optional[Currency] = Field(
+        None, description="Original transaction currency"
+    )
+    account_currency: Optional[Currency] = Field(
+        None, description="Account currency"
+    )
+    amount: Decimal = Field(
+        ..., description="Amount applied to the account balance"
+    )
+    balance_after: Decimal = Field(
+        ..., description="Balance after the transaction"
+    )
     currency: Currency = Field(..., description="Account currency")
-    category: Optional[str] = Field(None, description="Budget category for the transaction")
+    category: Optional[str] = Field(
+        None, description="Budget category for the transaction"
+    )
     note: Optional[str] = Field(None, description="Optional transaction note")
     created_at: datetime = Field(..., description="Transaction timestamp")
-    budget_warning: Optional[str] = Field(None, description="Optional warning when a category budget is exceeded")
+    budget_warning: Optional[str] = Field(
+        None, description="Optional warning when a category budget is exceeded"
+    )
 
     class Config:
         from_attributes = True
@@ -63,7 +93,9 @@ class TransactionResponse(BaseModel):
                 "currency": "USD",
                 "category": "groceries",
                 "note": "Salary",
-                "budget_warning": "Budget limit exceeded for category 'groceries'",
-                "created_at": "2026-05-11T12:34:56Z"
+                "budget_warning": (
+                    "Budget limit exceeded for category 'groceries'",
+                ),
+                "created_at": "2026-05-11T12:34:56Z",
             }
         }

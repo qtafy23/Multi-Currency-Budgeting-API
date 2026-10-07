@@ -1,10 +1,18 @@
 from datetime import datetime, timezone
-from decimal import Decimal
 
-from sqlalchemy import Column, Integer, Numeric, String, DateTime, ForeignKey, Enum
-from core.db import Base
-from core.constants.transaction import TransactionType
+from sqlalchemy import (
+    Column,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+)
+
 from core.constants.currency import Currency
+from core.constants.transaction import TransactionType
+from core.db import Base
 
 
 class Transaction(Base):
@@ -27,4 +35,7 @@ class Transaction(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     def __repr__(self) -> str:
-        return f"<Transaction(id={self.id}, account_id={self.account_id}, type={self.type}, amount={self.amount})>"
+        return (
+            f"<Transaction(id={self.id}, account_id={self.account_id}, "
+            f"type={self.type}, amount={self.amount})>"
+        )

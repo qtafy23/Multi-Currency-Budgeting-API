@@ -1,13 +1,11 @@
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
+from sqlalchemy import engine_from_config, pool
 
 from alembic import context
-
-from core.db import Base
-from apps import users  # Import all models via apps package
+from apps import users  # noqa: F401 - Import models for Alembic metadata
 from core.config.settings import settings
+from core.db import Base
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

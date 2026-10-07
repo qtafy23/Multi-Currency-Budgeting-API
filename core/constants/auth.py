@@ -6,7 +6,9 @@ from core.config.settings import settings
 
 # Token expiration times (in seconds)
 ACCESS_TOKEN_EXPIRE_SECONDS = settings.access_token_expire_minutes * 60
-REFRESH_TOKEN_EXPIRE_SECONDS = settings.refresh_token_expire_days * 24 * 60 * 60
+REFRESH_TOKEN_EXPIRE_SECONDS = (
+    settings.refresh_token_expire_days * 24 * 60 * 60
+)
 
 # Password requirements
 MIN_PASSWORD_LENGTH = 8
