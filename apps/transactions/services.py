@@ -133,8 +133,12 @@ class TransactionService:
 
             budget_warning = None
             if payload.type == TransactionType.EXPENSE and payload.category:
-                budget_warning = BudgetService.update_budget_spent_amount(
-                    user_id, payload.category, converted_amount, db
+                budget_warning = BudgetService.get_expense_budget_warning(
+                    user_id,
+                    payload.category,
+                    converted_amount,
+                    account_currency,
+                    db,
                 )
 
             new_balance = TransactionService.calculate_new_balance(

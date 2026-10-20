@@ -29,7 +29,7 @@ def create_budget(
     db: Session = Depends(get_db),
 ) -> BudgetResponse:
     budget = BudgetService.create_budget(current_user.id, payload, db)
-    return budget
+    return BudgetService.serialize_budget(current_user.id, budget, db)
 
 
 @router.get("/", response_model=List[BudgetResponse])
@@ -37,7 +37,11 @@ def list_budgets(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> List[BudgetResponse]:
-    return BudgetService.get_user_budgets(current_user.id, db)
+    budgets = BudgetService.get_user_budgets(current_user.id, db)
+    return [
+        BudgetService.serialize_budget(current_user.id, budget, db)
+        for budget in budgets
+    ]
 
 
 @router.get("/statistics", response_model=BudgetStatisticsResponse)
@@ -55,7 +59,8 @@ def get_budget(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> BudgetResponse:
-    return BudgetService.get_budget_by_id(current_user.id, budget_id, db)
+    budget = BudgetService.get_budget_by_id(current_user.id, budget_id, db)
+    return BudgetService.serialize_budget(current_user.id, budget, db)
 
 
 @router.put("/{budget_id}", response_model=BudgetResponse)
@@ -65,12 +70,15 @@ def update_budget(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> BudgetResponse:
-    if payload.limit is None:
+    if payload.limit is None and payload.currency is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="A new limit value must be provided",
+            detail="At least one budget field must be provided",
         )
-    return BudgetService.update_budget(current_user.id, budget_id, payload, db)
+    budget = BudgetService.update_budget(
+        current_user.id, budget_id, payload, db
+    )
+    return BudgetService.serialize_budget(current_user.id, budget, db)
 
 
 @router.delete("/{budget_id}")
@@ -90,5 +98,10 @@ def check_budget(
     db: Session = Depends(get_db),
 ) -> List[BudgetCheckResponse]:
     return BudgetService.check_budget_usage(
-        current_user.id, payload.category, payload.amount, db, payload.period
+        current_user.id,
+        payload.category,
+        payload.amount,
+        db,
+        payload.period,
+        payload.currency,
     )

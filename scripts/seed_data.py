@@ -32,12 +32,10 @@ BUDGETS = (
     {
         "category": "groceries",
         "limit": Decimal("600.00"),
-        "spent_amount": Decimal("245.30"),
     },
     {
         "category": "transport",
         "limit": Decimal("180.00"),
-        "spent_amount": Decimal("72.50"),
     },
 )
 

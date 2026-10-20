@@ -7,6 +7,7 @@ from typing import Optional
 from pydantic import BaseModel, Field, condecimal
 
 from core.constants.budgets import BudgetPeriod, BudgetStatus
+from core.constants.currency import Currency
 
 
 class BudgetCreate(BaseModel):
@@ -15,6 +16,10 @@ class BudgetCreate(BaseModel):
     )
     limit: condecimal(gt=0, max_digits=12, decimal_places=2) = Field(
         ..., description="Spending limit for the budget"
+    )
+    currency: Currency = Field(
+        default=Currency.EUR,
+        description="Currency used by this budget",
     )
     period: BudgetPeriod = Field(
         default=BudgetPeriod.MONTHLY, description="Budget period"
@@ -25,6 +30,7 @@ class BudgetCreate(BaseModel):
             "example": {
                 "category": "groceries",
                 "limit": 500.00,
+                "currency": "EUR",
                 "period": "monthly",
             }
         }
@@ -34,9 +40,14 @@ class BudgetUpdate(BaseModel):
     limit: Optional[condecimal(gt=0, max_digits=12, decimal_places=2)] = Field(
         None, description="New spending limit for the budget"
     )
+    currency: Optional[Currency] = Field(
+        None, description="New currency for the budget limit"
+    )
 
     class Config:
-        json_schema_extra = {"example": {"limit": 600.00}}
+        json_schema_extra = {
+            "example": {"limit": 600.00, "currency": "USD"}
+        }
 
 
 class BudgetResponse(BaseModel):
@@ -46,6 +57,7 @@ class BudgetResponse(BaseModel):
     limit: Decimal = Field(..., description="Spending limit")
     spent_amount: Decimal = Field(..., description="Amount already spent")
     period: BudgetPeriod = Field(..., description="Budget period")
+    currency: Currency = Field(..., description="Budget currency")
     status: BudgetStatus = Field(..., description="Current budget status")
     usage_percentage: float = Field(..., description="Budget usage percentage")
     remaining_amount: Decimal = Field(
@@ -70,6 +82,7 @@ class BudgetStatusCounts(BaseModel):
 
 class BudgetStatisticsResponse(BaseModel):
     total_budgets: int = Field(..., description="Total number of budgets")
+    currency: Currency = Field(..., description="Currency for totals")
     total_limit: Decimal = Field(..., description="Combined budget limit")
     total_spent: Decimal = Field(..., description="Combined spent amount")
     total_remaining: Decimal = Field(
@@ -87,6 +100,10 @@ class BudgetCheckRequest(BaseModel):
     amount: Decimal = Field(
         ..., gt=0, description="Expense amount to validate"
     )
+    currency: Currency = Field(
+        default=Currency.EUR,
+        description="Currency of the proposed expense amount",
+    )
     period: Optional[BudgetPeriod] = Field(
         None, description="Optional budget period to check"
     )
@@ -96,6 +113,7 @@ class BudgetCheckResponse(BaseModel):
     category: str = Field(..., description="Budget category")
     period: BudgetPeriod = Field(..., description="Budget period")
     limit: Decimal = Field(..., description="Budget limit")
+    currency: Currency = Field(..., description="Budget currency")
     spent_amount: Decimal = Field(..., description="Budget spent amount")
     remaining_amount: Decimal = Field(
         ..., description="Remaining budget amount"

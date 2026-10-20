@@ -1,12 +1,19 @@
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import List, Optional
 
 from fastapi import HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from apps.accounts.models import Account
 from apps.budgets.models import Budget
 from apps.budgets.schemas import BudgetCreate, BudgetUpdate
+from apps.exchange.services import ExchangeRateService
+from apps.transactions.models import Transaction
 from core.constants.budgets import BudgetPeriod, BudgetStatus
+from core.constants.currency import EXCHANGE_BASE_CURRENCY, Currency
+from core.constants.transaction import TransactionType
 
 
 class BudgetService:
@@ -15,6 +22,126 @@ class BudgetService:
     @staticmethod
     def normalize_category(category: str) -> str:
         return category.strip().lower()
+
+    @staticmethod
+    def _period_window(
+        period: BudgetPeriod, as_of: Optional[datetime] = None
+    ) -> tuple[datetime, datetime]:
+        current = as_of or datetime.now(timezone.utc)
+        if current.tzinfo is not None:
+            current = current.astimezone(timezone.utc).replace(tzinfo=None)
+
+        if period == BudgetPeriod.WEEKLY:
+            week_start = current - timedelta(days=current.weekday())
+            period_start = week_start.replace(
+                hour=0, minute=0, second=0, microsecond=0
+            )
+            return period_start, period_start + timedelta(days=7)
+
+        period_start = current.replace(
+            day=1, hour=0, minute=0, second=0, microsecond=0
+        )
+        if period_start.month == 12:
+            period_end = period_start.replace(
+                year=period_start.year + 1, month=1
+            )
+        else:
+            period_end = period_start.replace(month=period_start.month + 1)
+        return period_start, period_end
+
+    @staticmethod
+    def get_budget_spent_amount(
+        user_id: int,
+        budget: Budget,
+        db: Session,
+        as_of: Optional[datetime] = None,
+    ) -> Decimal:
+        period_start, period_end = BudgetService._period_window(
+            budget.period, as_of
+        )
+        normalized_category = BudgetService.normalize_category(
+            budget.category
+        )
+        totals_by_currency = (
+            db.query(
+                Transaction.currency,
+                func.coalesce(func.sum(Transaction.amount), 0),
+            )
+            .join(Account, Account.id == Transaction.account_id)
+            .filter(
+                Account.user_id == user_id,
+                Transaction.type == TransactionType.EXPENSE,
+                func.lower(func.trim(Transaction.category))
+                == normalized_category,
+                Transaction.created_at >= period_start,
+                Transaction.created_at < period_end,
+            )
+            .group_by(Transaction.currency)
+            .all()
+        )
+        total_spent = Decimal("0")
+        for transaction_currency, amount in totals_by_currency:
+            total_spent += ExchangeRateService.convert_amount(
+                db,
+                Currency(transaction_currency),
+                Currency(budget.currency),
+                Decimal(str(amount)),
+            )
+        return total_spent
+
+    @staticmethod
+    def get_budget_summary(
+        user_id: int,
+        budget: Budget,
+        db: Session,
+        as_of: Optional[datetime] = None,
+    ) -> dict:
+        spent_amount = BudgetService.get_budget_spent_amount(
+            user_id, budget, db, as_of
+        )
+        remaining_amount = max(budget.limit - spent_amount, Decimal("0"))
+        usage_percentage = (
+            float(
+                min(
+                    Decimal("100"),
+                    spent_amount / budget.limit * Decimal("100"),
+                )
+            )
+            if budget.limit
+            else 0.0
+        )
+        if spent_amount >= budget.limit:
+            budget_status = BudgetStatus.EXCEEDED
+        elif spent_amount >= budget.limit * Decimal("0.8"):
+            budget_status = BudgetStatus.WARNING
+        else:
+            budget_status = BudgetStatus.NORMAL
+
+        return {
+            "spent_amount": spent_amount,
+            "remaining_amount": remaining_amount,
+            "usage_percentage": usage_percentage,
+            "status": budget_status,
+        }
+
+    @staticmethod
+    def serialize_budget(
+        user_id: int,
+        budget: Budget,
+        db: Session,
+        as_of: Optional[datetime] = None,
+    ) -> dict:
+        return {
+            "id": budget.id,
+            "user_id": budget.user_id,
+            "category": budget.category,
+            "limit": budget.limit,
+            "currency": Currency(budget.currency),
+            "period": budget.period,
+            "created_at": budget.created_at,
+            "updated_at": budget.updated_at,
+            **BudgetService.get_budget_summary(user_id, budget, db, as_of),
+        }
 
     @staticmethod
     def create_budget(
@@ -40,7 +167,7 @@ class BudgetService:
             user_id=user_id,
             category=category,
             limit=payload.limit,
-            spent_amount=Decimal("0"),
+            currency=payload.currency.value,
             period=payload.period,
         )
         db.add(budget)
@@ -79,6 +206,8 @@ class BudgetService:
 
         if payload.limit is not None:
             budget.limit = payload.limit
+        if payload.currency is not None:
+            budget.currency = payload.currency.value
 
         db.commit()
         db.refresh(budget)
@@ -106,25 +235,61 @@ class BudgetService:
         return query.all()
 
     @staticmethod
-    def get_budget_statistics(user_id: int, db: Session) -> dict:
+    def get_budget_statistics(
+        user_id: int, db: Session, as_of: Optional[datetime] = None
+    ) -> dict:
         budgets = BudgetService.get_user_budgets(user_id, db)
-        total_limit = sum((budget.limit or Decimal("0")) for budget in budgets)
+        total_limit = sum(
+            (
+                ExchangeRateService.convert_amount(
+                    db,
+                    Currency(budget.currency),
+                    EXCHANGE_BASE_CURRENCY,
+                    budget.limit or Decimal("0"),
+                )
+                for budget in budgets
+            ),
+            Decimal("0"),
+        )
+        summaries = [
+            BudgetService.get_budget_summary(user_id, budget, db, as_of)
+            for budget in budgets
+        ]
         total_spent = sum(
-            (budget.spent_amount or Decimal("0")) for budget in budgets
+            (
+                ExchangeRateService.convert_amount(
+                    db,
+                    Currency(budget.currency),
+                    EXCHANGE_BASE_CURRENCY,
+                    summary["spent_amount"],
+                )
+                for budget, summary in zip(budgets, summaries)
+            ),
+            Decimal("0"),
         )
         total_remaining = sum(
-            (budget.remaining_amount or Decimal("0")) for budget in budgets
+            (
+                ExchangeRateService.convert_amount(
+                    db,
+                    Currency(budget.currency),
+                    EXCHANGE_BASE_CURRENCY,
+                    summary["remaining_amount"],
+                )
+                for budget, summary in zip(budgets, summaries)
+            ),
+            Decimal("0"),
         )
         status_counts = {
             BudgetStatus.NORMAL.value: 0,
             BudgetStatus.WARNING.value: 0,
             BudgetStatus.EXCEEDED.value: 0,
         }
-        for budget in budgets:
-            status_counts[budget.status.value] += 1
+        for summary in summaries:
+            status_counts[summary["status"].value] += 1
 
         return {
             "total_budgets": len(budgets),
+            "currency": EXCHANGE_BASE_CURRENCY,
             "total_limit": total_limit,
             "total_spent": total_spent,
             "total_remaining": total_remaining,
@@ -138,6 +303,7 @@ class BudgetService:
         amount: Decimal,
         db: Session,
         period: Optional[BudgetPeriod] = None,
+        currency: Currency = Currency.EUR,
     ) -> List[dict]:
         budgets = BudgetService.get_category_budgets(
             user_id, category, db, period
@@ -147,30 +313,39 @@ class BudgetService:
 
         response = []
         for budget in budgets:
-            projected_spent = (budget.spent_amount or Decimal("0")) + amount
+            summary = BudgetService.get_budget_summary(
+                user_id, budget, db
+            )
+            converted_amount = ExchangeRateService.convert_amount(
+                db,
+                currency,
+                Currency(budget.currency),
+                amount,
+            )
+            projected_spent = summary["spent_amount"] + converted_amount
             warning = None
             if projected_spent >= budget.limit:
                 warning = "Budget limit exceeded"
             elif projected_spent >= budget.limit * Decimal("0.8"):
                 warning = "Budget usage has reached 80% of the limit"
 
-            response.append(
-                {
-                    "category": budget.category,
-                    "period": budget.period,
-                    "limit": budget.limit,
-                    "spent_amount": budget.spent_amount,
-                    "remaining_amount": budget.remaining_amount,
-                    "usage_percentage": budget.usage_percentage,
-                    "status": budget.status,
-                    "warning": warning,
-                }
-            )
+            response.append({
+                "category": budget.category,
+                "period": budget.period,
+                "limit": budget.limit,
+                "currency": Currency(budget.currency),
+                **summary,
+                "warning": warning,
+            })
         return response
 
     @staticmethod
-    def update_budget_spent_amount(
-        user_id: int, category: str, amount: Decimal, db: Session
+    def get_expense_budget_warning(
+        user_id: int,
+        category: str,
+        amount: Decimal,
+        currency: Currency,
+        db: Session,
     ) -> Optional[str]:
         budgets = BudgetService.get_category_budgets(user_id, category, db)
         if not budgets:
@@ -178,16 +353,19 @@ class BudgetService:
 
         warning: Optional[str] = None
         for budget in budgets:
-            budget.spent_amount = (
-                budget.spent_amount or Decimal("0")
-            ) + amount
-            if budget.spent_amount >= budget.limit:
+            summary = BudgetService.get_budget_summary(
+                user_id, budget, db
+            )
+            converted_amount = ExchangeRateService.convert_amount(
+                db, currency, Currency(budget.currency), amount
+            )
+            projected_spent = summary["spent_amount"] + converted_amount
+            if projected_spent >= budget.limit:
                 warning = f"Budget limit exceeded for category '{category}'"
-            elif budget.spent_amount >= budget.limit * Decimal("0.8"):
+            elif projected_spent >= budget.limit * Decimal("0.8"):
                 warning = (
                     warning
                     or f"Budget usage reached 80% for category '{category}'"
                 )
 
-        db.flush()
         return warning
