@@ -1,30 +1,36 @@
-# Project automation commands
-.PHONY: help dev test lint format db-status migrate seed docker-dev docker-test docker-prod
+# Project shortcuts
+.PHONY: help dev test lint format db-status migrate seed prod down
 
 PYTHON_SOURCES = apps core scripts tests alembic main.py
 
 help:
 	@echo "Available targets:"
-	@echo "  make dev         Start the local FastAPI development server"
-	@echo "  make test        Run the pytest suite"
+	@echo "  make dev         Start the development Compose stack"
+	@echo "  make test        Run pytest in the test Compose environment"
 	@echo "  make lint        Run flake8"
 	@echo "  make format      Format Python and sort imports"
-	@echo "  make db-status   Check Alembic migration status"
-	@echo "  make migrate     Apply Alembic migrations"
-	@echo "  make seed        Insert demo seed data for local dev/test"
-	@echo "  make docker-dev  Start the development stack with Docker Compose"
-	@echo "  make docker-test Start the isolated test stack with Docker Compose"
-	@echo "  make docker-prod Start the production stack with Docker Compose"
+	@echo "  make db-status   Show dev database migration status"
+	@echo "  make migrate     Apply dev database migrations"
+	@echo "  make seed        Insert demo data into the dev database"
+	@echo "  make prod        Start the production Compose stack"
+	@echo "  make down        Stop the development Compose stack"
 
-# Local development server
+# Docker Compose workflows
 dev:
-	@echo "Starting development server..."
-	uvicorn main:app --reload --host 0.0.0.0 --port 8000
+	@echo "Starting development stack..."
+	docker compose -f docker-compose.dev.yml up --build -d
 
-# Testing
 test:
-	@echo "Running pytest..."
-	PYTHONPATH=. python -m pytest -q
+	@echo "Running tests in the test container..."
+	docker compose -f docker-compose.test.yml run --build --rm api python -m pytest -q
+
+prod:
+	@echo "Starting production stack..."
+	docker compose -f docker-compose.prod.yml up --build -d
+
+down:
+	@echo "Stopping development stack..."
+	docker compose -f docker-compose.dev.yml down
 
 # Linting and formatting
 lint:
@@ -38,28 +44,16 @@ format:
 
 # Database migration commands
 db-status:
-	@echo "Checking database migration status..."
-	alembic current
+	@echo "Checking dev database migration status..."
+	docker compose -f docker-compose.dev.yml exec api alembic current
 	@echo "Migration history:"
-	alembic history --verbose
+	docker compose -f docker-compose.dev.yml exec api alembic history --verbose
 
 migrate:
-	@echo "Applying Alembic migrations..."
-	alembic upgrade head
+	@echo "Applying dev database migrations..."
+	docker compose -f docker-compose.dev.yml exec api alembic upgrade head
 
 seed:
 	@echo "Inserting demo data into the development database..."
 	docker compose -f docker-compose.dev.yml exec api python -m scripts.seed_data
 
-# Docker commands
-docker-dev:
-	@echo "Starting development environment with Docker..."
-	docker compose -f docker-compose.dev.yml up --build -d
-
-docker-test:
-	@echo "Starting test environment with Docker..."
-	docker compose -f docker-compose.test.yml up --build -d
-
-docker-prod:
-	@echo "Starting production environment with Docker..."
-	docker compose -f docker-compose.prod.yml up --build -d

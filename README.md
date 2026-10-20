@@ -70,6 +70,7 @@ This keeps the setup explicit and avoids ambiguity when multiple environments ex
 
 - Docker and Docker Compose support (`docker compose` is the preferred form)
 - Python 3.12+ for local non-Docker development
+- GNU Make is optional and only needed for the shortcuts in the Makefile
 
 > Database and Redis are provided automatically by Docker Compose in the dev/test stack. If you run locally without Docker, define `DATABASE_URL` and `REDIS_URL` in `.env`.
 
@@ -91,11 +92,6 @@ Then adjust values for your current environment. This is required for app startu
 docker compose -f docker-compose.dev.yml up -d
 ```
 
-If you want to use Makefile shortcuts instead of raw commands:
-
-```bash
-make docker-dev
-```
 Access:
 
 - API: http://localhost:8000
@@ -120,19 +116,7 @@ The project uses pytest fixtures from [tests/conftest.py](tests/conftest.py). Sh
 For a quick project-level shortcut:
 
 ```bash
-make docker-test
-```
-
-Run the full suite:
-
-```bash
-docker compose -f docker-compose.test.yml up --build
-```
-
-Or run tests directly in the test container:
-
-```bash
-docker compose -f docker-compose.test.yml run --rm api python -m pytest -q
+docker compose -f docker-compose.test.yml run --build --rm api python -m pytest -q
 ```
 
 Run a specific file:
@@ -152,12 +136,6 @@ cp .env.example .env
 # update values for production
 
 docker compose -f docker-compose.prod.yml up -d
-```
-
-Or via Makefile:
-
-```bash
-make docker-prod
 ```
 
 ## Local development without Docker
@@ -245,6 +223,17 @@ Demo credentials:
 - email: `demo@example.com`
 - password: `dev-only-password`
 
+## Budget spending
+
+Budgets have their own currency (EUR by default). Spending is calculated from
+expense transactions in the current period and converted from each account's
+currency into the budget currency using the latest stored exchange rates. As
+rates are refreshed, historical converted spending can change. Statistics totals
+are converted to EUR.
+Weekly budgets use Monday 00:00 UTC through the following Monday; monthly budgets
+use the first day of the month through the first day of the next month. The end
+boundary is exclusive.
+
 ## Exchange-rate integration
 
 Rates are refreshed from the keyless Frankfurter API.
@@ -283,23 +272,9 @@ Primary auth endpoints are exposed via FastAPI docs and the application login fl
 
 ## Tests
 
-This project contains service-level and integration-style pytest tests under [tests](tests).
-
-Common commands:
-
-```bash
-docker compose -f docker-compose.test.yml run --rm api python -m pytest -q
-docker compose -f docker-compose.test.yml run --rm api python -m pytest tests/test_auth_and_account_ownership.py -q
-docker compose -f docker-compose.test.yml run --rm api python -m pytest tests/test_exchange_rates.py -q
-docker compose -f docker-compose.test.yml run --rm api python -m pytest tests/test_transactions.py -q
-docker compose -f docker-compose.test.yml run --rm api python -m pytest tests/test_budgets.py -q
-```
-
-Local run without Docker:
-
-```bash
-pytest -q
-```
+Tests live under [tests](tests). Pytest automatically loads [tests/conftest.py](tests/conftest.py),
+which provides an isolated in-memory database and FastAPI dependency overrides. Use the test
+commands in the Testing environment section above.
 
 ## Useful commands
 
@@ -373,3 +348,4 @@ docker compose -f docker-compose.dev.yml build --no-cache
 - the app is designed around explicit environment separation between dev, test, and prod
 - the test environment is isolated from production data by design
 - Celery workers and Beat are part of the normal runtime flow and should be started with the matching Compose file
+- optional Makefile shortcuts are listed by `make help`
