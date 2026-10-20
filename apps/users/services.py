@@ -175,7 +175,7 @@ class AuthenticationService:
             raise ValueError(ERROR_INVALID_TOKEN)
 
         # Create new access token
-        token_data = {"sub": user.id, "email": user.email}
+        token_data = {"sub": str(user.id), "email": user.email}
         access_token = create_access_token(token_data)
 
         return TokenResponse(
