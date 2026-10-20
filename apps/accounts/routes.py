@@ -8,7 +8,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from apps.accounts.models import Account
-from apps.accounts.schemas import AccountCreate, AccountResponse, AccountUpdate
+from apps.accounts.schemas import (
+    AccountCreate,
+    AccountResponse,
+    AccountUpdate,
+    AccountCurrencyConversionRequest
+)
+from apps.accounts.services import AccountService
+from apps.transactions.schemas import TransactionResponse
 from apps.users.models import User
 from apps.users.routes import get_current_user, get_db
 
@@ -81,7 +88,7 @@ def update_account(
     """Update account details for the authenticated user."""
     account = get_account_or_404(account_id, current_user.id, db)
 
-    if not any([data.name, data.currency, data.is_active is not None]):
+    if data.name is None and data.is_active is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="At least one field must be provided for update",
@@ -89,14 +96,32 @@ def update_account(
 
     if data.name is not None:
         account.name = data.name
-    if data.currency is not None:
-        account.currency = data.currency
     if data.is_active is not None:
         account.is_active = data.is_active
 
     db.commit()
     db.refresh(account)
     return account
+
+
+@router.post(
+    "/{account_id}/convert-currency",
+    response_model=TransactionResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def convert_account_currency(
+    account_id: int,
+    payload: AccountCurrencyConversionRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> TransactionResponse:
+    """Convert the entire account balance into another currency."""
+    return AccountService.convert_currency(
+        account_id=account_id,
+        user_id=current_user.id,
+        target_currency=payload.target_currency,
+        db=db,
+    )
 
 
 @router.delete("/{account_id}")

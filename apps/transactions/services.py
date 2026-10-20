@@ -98,6 +98,15 @@ class TransactionService:
         Returns the transaction and a boolean flag
         indicating if it was newly created.
         """
+        if payload.type == TransactionType.CONVERSION:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Use the account currency conversion endpoint "
+                    "to convert an account balance"
+                ),
+            )
+        
         existing = TransactionService.find_idempotent_transaction(
             db, user_id, payload.external_id, idempotency_key
         )

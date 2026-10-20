@@ -27,6 +27,7 @@ class Transaction(Base):
     converted_amount = Column(Numeric(12, 2), nullable=True)
     original_currency = Column(Enum(Currency), nullable=True)
     account_currency = Column(Enum(Currency), nullable=True)
+    exchange_rate = Column(Numeric(18, 8), nullable=True)
     amount = Column(Numeric(12, 2), nullable=False)
     balance_after = Column(Numeric(12, 2), nullable=False)
     currency = Column(String, nullable=False)

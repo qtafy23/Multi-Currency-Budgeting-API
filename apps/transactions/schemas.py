@@ -60,6 +60,9 @@ class TransactionResponse(BaseModel):
     account_currency: Optional[Currency] = Field(
         None, description="Account currency"
     )
+    exchange_rate: Optional[Decimal] = Field(
+        None, description="Exchange rate used for currency conversion"
+    )
     amount: Decimal = Field(
         ..., description="Amount applied to the account balance"
     )
