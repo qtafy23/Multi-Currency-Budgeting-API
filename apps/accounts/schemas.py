@@ -86,6 +86,7 @@ class AccountCurrencyConversionRequest(BaseModel):
 
 
 class AccountCurrencyConversionResponse(BaseModel):
+    """Response after converting the account balance to a new currency."""
     model_config = ConfigDict(from_attributes=True)
 
     account: AccountResponse

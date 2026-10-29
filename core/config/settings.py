@@ -1,64 +1,78 @@
-from pydantic import Field
-from pydantic_settings import BaseSettings
+from pydantic import Field, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     """
-    Application settings - manages both environment variables and config files.
+    Application settings - manages both environment
+    variables and config files.
     Priority: environment variables > .env file > defaults
     """
 
-    # App Settings
-    app_name: str = Field(
-        default="Multi-Currency Budgeting API", env="APP_NAME"
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=False,
     )
-    env: str = Field(default="development", env="ENV")
-    debug: bool = Field(default=True, env="DEBUG")
+
+    # App Settings
+    app_name: str = "Multi-Currency Budgeting API"
+    env: str = "development"
+    debug: bool = False
 
     # Server Settings
-    host: str = Field(default="0.0.0.0", env="HOST")
-    port: int = Field(default=8000, env="PORT")
-    workers: int = Field(default=1, env="WORKERS")
+    host: str = Field(default="0.0.0.0")
+    port: int = Field(default=8000)
+    workers: int = Field(default=1)
 
     # Database Settings
     database_url: str = Field(
-        default="postgresql://postgres:postgres@localhost:5432/mcb_dev",
-        env="DATABASE_URL",
+        default="postgresql://postgres:postgres@localhost:5432/mcb_dev"
     )
-    db_echo: bool = Field(default=False, env="DB_ECHO")
+    db_echo: bool = False
 
     # Redis Settings
-    redis_url: str = Field(default="redis://localhost:6379/0", env="REDIS_URL")
+    redis_url: str = Field(default="redis://localhost:6379/0")
 
     # Exchange Rate Settings
-    exchange_rate_update_interval_minutes: int = Field(
-        default=1440,
-    )
+    exchange_rate_update_interval_minutes: int = Field(default=1440)
 
     # Security Settings
-    secret_key: str = Field(
-        default="your-secret-key-change-in-production", env="SECRET_KEY"
-    )
-    algorithm: str = Field(default="HS256", env="ALGORITHM")
-    access_token_expire_minutes: int = Field(
-        default=15, env="ACCESS_TOKEN_EXPIRE_MINUTES"
-    )
-    refresh_token_expire_days: int = Field(
-        default=7, env="REFRESH_TOKEN_EXPIRE_DAYS"
-    )
+    secret_key: str = Field(default="your-secret-key-change-in-production")
+    algorithm: str = Field(default="HS256")
+    access_token_expire_minutes: int = Field(default=15)
+    refresh_token_expire_days: int = Field(default=7)
 
     # CORS Settings
     cors_origins: list = Field(
-        default=["http://localhost:3000", "http://localhost:8000"],
-        env="CORS_ORIGINS",
+        default=["http://localhost:3000", "http://localhost:8000"]
     )
-    cors_credentials: bool = Field(default=True, env="CORS_CREDENTIALS")
-    cors_methods: list = Field(default=["*"], env="CORS_METHODS")
-    cors_headers: list = Field(default=["*"], env="CORS_HEADERS")
+    cors_credentials: bool = Field(default=True)
+    cors_methods: list = Field(default=["*"])
+    cors_headers: list = Field(default=["*"])
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    @model_validator(mode="after")
+    def validate_production_settings(self):
+        if self.env.strip().lower() != "production":
+            return self
+
+        if self.debug:
+            raise ValueError("DEBUG must be False in production")
+
+        placeholder_keys = {
+            "secret",
+            "changeme",
+            "your-secret-key",
+            "your-secret-key-change-in-production",
+            "dev-secret-key",
+        }
+
+        if (len(self.secret_key) < 32 or self.secret_key.lower() in placeholder_keys):
+            raise ValueError(
+                "SECRET_KEY must be a strong key of at least 32 characters "
+                "in production"
+            )
+
+        return self
 
 
 # Load settings
@@ -68,4 +82,3 @@ settings = Settings()
 if settings.env == "development":
     print(f"[Config] Environment: {settings.env}")
     print(f"[Config] Debug: {settings.debug}")
-    print(f"[Config] Database: {settings.database_url}")
