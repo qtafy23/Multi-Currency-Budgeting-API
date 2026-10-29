@@ -8,6 +8,7 @@ from decimal import Decimal
 from pydantic import BaseModel, ConfigDict, Field
 
 from core.constants.currency import Currency
+from apps.transactions.schemas import TransactionResponse
 
 
 class AccountCreate(BaseModel):
@@ -82,3 +83,13 @@ class AccountCurrencyConversionRequest(BaseModel):
                 "target_currency": "EUR",
             }
         }
+
+
+class AccountCurrencyConversionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    account: AccountResponse
+    transaction: Optional[TransactionResponse] = None
+    event_id: Optional[int] = None
+    converted: bool
+

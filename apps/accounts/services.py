@@ -3,7 +3,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from apps.accounts.models import Account
+from apps.accounts.models import Account, AccountEvent
 from apps.exchange.services import ExchangeRateService
 from apps.transactions.models import Transaction
 from apps.users.models import User
@@ -46,6 +46,37 @@ class AccountService:
                 detail="Account already uses the target currency",
             )
 
+        old_balance = Decimal(str(account.balance or 0))
+
+        if old_balance == Decimal("0.00"):
+            event = AccountEvent(
+                account_id=account.id,
+                event_type="currency_changed",
+                old_currency=source_currency.value,
+                new_currency=target_currency.value,
+                details={
+                    "balance": "0.00",
+                    "reason": "zero_balance_currency_change",
+                },
+            )
+
+            account.currency = target_currency.value
+            db.add(event)
+
+            try:
+                db.commit()
+                db.refresh(account)
+            except Exception:
+                db.rollback()
+                raise
+
+            return {
+                "account": account,
+                "transaction": None,
+                "event_id": event.id,
+                "converted": False,
+            }
+
         try:
             exchange_rate = ExchangeRateService.get_rate(
                 db, source_currency, target_currency
@@ -84,8 +115,14 @@ class AccountService:
             db.add(transaction)
             db.commit()
             db.refresh(transaction)
+            db.refresh(account)
 
-            return transaction
+            return {
+                "account": account,
+                "transaction": transaction,
+                "event_id": None,
+                "converted": True,
+            }
 
         except Exception:
             db.rollback()

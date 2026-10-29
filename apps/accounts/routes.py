@@ -12,7 +12,8 @@ from apps.accounts.schemas import (
     AccountCreate,
     AccountResponse,
     AccountUpdate,
-    AccountCurrencyConversionRequest
+    AccountCurrencyConversionRequest,
+    AccountCurrencyConversionResponse,
 )
 from apps.accounts.services import AccountService
 from apps.transactions.schemas import TransactionResponse
@@ -106,15 +107,15 @@ def update_account(
 
 @router.post(
     "/{account_id}/convert-currency",
-    response_model=TransactionResponse,
-    status_code=status.HTTP_201_CREATED,
+    response_model=AccountCurrencyConversionResponse,
+    status_code=status.HTTP_200_OK,
 )
 def convert_account_currency(
     account_id: int,
     payload: AccountCurrencyConversionRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-) -> TransactionResponse:
+) -> AccountCurrencyConversionResponse:
     """Convert the entire account balance into another currency."""
     return AccountService.convert_currency(
         account_id=account_id,
