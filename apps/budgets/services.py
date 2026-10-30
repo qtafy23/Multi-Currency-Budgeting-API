@@ -3,7 +3,7 @@ from decimal import Decimal
 from typing import List, Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import func
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from apps.accounts.models import Account
@@ -235,9 +235,57 @@ class BudgetService:
         return query.all()
 
     @staticmethod
+    def _get_total_budgeted_spending(
+        user_id: int, db: Session, as_of: datetime
+    ) -> Decimal:
+        """Sum each expense covered by any current user budget once, in EUR."""
+        windows = []
+        for period in BudgetPeriod:
+            start, end = BudgetService._period_window(period, as_of)
+            windows.append(and_(
+                Budget.period == period,
+                Transaction.created_at >= start,
+                Transaction.created_at < end,
+            ))
+        matching_budget = (
+            db.query(Budget.id)
+            .filter(
+                Budget.user_id == user_id,
+                func.lower(func.trim(Budget.category))
+                == func.lower(func.trim(Transaction.category)),
+                or_(*windows),
+            )
+            .exists()
+        )
+        # EXISTS avoids multiplying a transaction when several budgets match.
+        totals_by_currency = (
+            db.query(Transaction.currency, func.sum(Transaction.amount))
+            .join(Account, Account.id == Transaction.account_id)
+            .filter(
+                Account.user_id == user_id,
+                Transaction.type == TransactionType.EXPENSE,
+                matching_budget,
+            )
+            .group_by(Transaction.currency)
+            .all()
+        )
+        return sum(
+            (
+                ExchangeRateService.convert_amount(
+                    db, Currency(currency), EXCHANGE_BASE_CURRENCY,
+                    Decimal(str(amount)),
+                )
+                for currency, amount in totals_by_currency
+            ),
+            Decimal("0"),
+        )
+
+
+    @staticmethod
     def get_budget_statistics(
         user_id: int, db: Session, as_of: Optional[datetime] = None
     ) -> dict:
+        as_of = as_of or datetime.now(timezone.utc)
         budgets = BudgetService.get_user_budgets(user_id, db)
         total_limit = sum(
             (
@@ -255,17 +303,9 @@ class BudgetService:
             BudgetService.get_budget_summary(user_id, budget, db, as_of)
             for budget in budgets
         ]
-        total_spent = sum(
-            (
-                ExchangeRateService.convert_amount(
-                    db,
-                    Currency(budget.currency),
-                    EXCHANGE_BASE_CURRENCY,
-                    summary["spent_amount"],
-                )
-                for budget, summary in zip(budgets, summaries)
-            ),
-            Decimal("0"),
+        total_spent = (
+            BudgetService._get_total_budgeted_spending(user_id, db, as_of)
+            if budgets else Decimal("0")
         )
         total_remaining = sum(
             (

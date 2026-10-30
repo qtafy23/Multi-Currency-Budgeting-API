@@ -264,6 +264,21 @@ Weekly budgets use Monday 00:00 UTC through the following Monday; monthly budget
 use the first day of the month through the first day of the next month. The end
 boundary is exclusive.
 
+For `GET /api/v1/budgets/statistics`, `total_spent` is the sum of unique expense
+transactions covered by at least one of the user's budgets in its current
+calendar period. A 25 EUR food expense covered by both weekly and monthly food
+budgets contributes 25 EUR to `total_spent`, while each budget's `spent_amount`
+is 25 EUR. Expenses outside all budget categories/windows are excluded; with no
+budgets, `total_spent` is zero. At month boundaries the total includes the union
+of the current weekly and monthly windows, which can include days in the prior
+month. Each window includes its start and excludes its end.
+
+Expenses are aggregated by their stored transaction currency and converted
+directly to EUR using current stored rates. `total_limit` and `total_remaining`
+sum limits and remaining allowances for each budget independently, and status
+counts also refer to budgets. As a result, overlapping budgets can make
+`total_remaining` differ from `total_limit - total_spent`.
+
 ## Exchange-rate integration
 
 Rates are refreshed from the keyless Frankfurter API.

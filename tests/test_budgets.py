@@ -31,12 +31,13 @@ def _add_transaction(
     amount,
     created_at,
     transaction_type=TransactionType.EXPENSE,
+    currency="EUR",
 ):
     account = Account(
         user_id=user.id,
         name=f"Account {created_at.isoformat()}",
         balance=Decimal("1000.00"),
-        currency="EUR",
+        currency=currency,
         is_active=True,
     )
     db_session.add(account)
@@ -48,7 +49,7 @@ def _add_transaction(
             type=transaction_type,
             amount=amount,
             balance_after=Decimal("1000.00"),
-            currency="EUR",
+            currency=currency,
             category=category,
             created_at=created_at,
         )
@@ -346,6 +347,129 @@ def test_budget_statistics_counts_statuses_correctly(db_session):
     assert stats["status_counts"][BudgetStatus.EXCEEDED.value] == 1
 
 
+def test_statistics_count_overlapping_budget_expenses_once(db_session):
+    user = _create_user(db_session)
+    for period in [BudgetPeriod.WEEKLY, BudgetPeriod.MONTHLY]:
+        BudgetService.create_budget(
+            user.id,
+            BudgetCreate(category="food", limit="100.00", period=period),
+            db_session,
+        )
+    _add_transaction(
+        db_session, user, category=" FOOD ", amount=Decimal("25.00"),
+        created_at=datetime(2026, 10, 6, 12),
+    )
+    stats = BudgetService.get_budget_statistics(
+        user.id, db_session, as_of=datetime(2026, 10, 7, tzinfo=timezone.utc)
+    )
+    assert stats["total_spent"] == Decimal("25.00")
+    # Limits, remaining allowances and statuses still describe each budget.
+    assert stats["total_limit"] == Decimal("200.00")
+    assert stats["total_remaining"] == Decimal("150.00")
+    assert stats["total_budgets"] == 2
+    assert stats["status_counts"][BudgetStatus.NORMAL.value] == 2
+
+
+def test_statistics_use_union_of_current_budget_windows(db_session):
+    user = _create_user(db_session)
+    for period in [BudgetPeriod.WEEKLY, BudgetPeriod.MONTHLY]:
+        BudgetService.create_budget(
+            user.id,
+            BudgetCreate(category="food", limit="1000.00", period=period),
+            db_session,
+        )
+    # On October 1 the current week begins in September. Keep its expenses
+    # and monthly-only expenses, count overlaps once, exclude both end bounds.
+    for created_at, amount in [
+        (datetime(2026, 9, 27, 23, 59, 59), "999.00"),
+        (datetime(2026, 9, 28), "10.00"),
+        (datetime(2026, 9, 30, 12), "15.00"),
+        (datetime(2026, 10, 1), "20.00"),
+        (datetime(2026, 10, 4, 23, 59, 59), "25.00"),
+        (datetime(2026, 10, 5), "30.00"),
+        (datetime(2026, 10, 31, 23, 59, 59), "35.00"),
+        (datetime(2026, 11, 1), "999.00"),
+    ]:
+        _add_transaction(
+            db_session, user, category="food", amount=Decimal(amount),
+            created_at=created_at,
+        )
+    stats = BudgetService.get_budget_statistics(
+        user.id, db_session, as_of=datetime(2026, 10, 1, tzinfo=timezone.utc)
+    )
+    assert stats["total_spent"] == Decimal("135.00")
+
+
+def test_statistics_convert_unique_expenses_and_keep_user_category_scope(
+    db_session,
+):
+    user = _create_user(db_session)
+    other = _create_user(db_session, "other-statistics@example.com")
+    for source, target, rate in [
+        (Currency.USD, Currency.EUR, "0.5"),
+        (Currency.EUR, Currency.USD, "2"),
+        (Currency.GBP, Currency.EUR, "2"),
+        (Currency.EUR, Currency.GBP, "0.5"),
+        (Currency.USD, Currency.GBP, "0.25"),
+        (Currency.GBP, Currency.USD, "4"),
+    ]:
+        db_session.add(ExchangeRate(
+            from_currency=source, to_currency=target, rate=Decimal(rate),
+        ))
+    for period, currency in [
+        (BudgetPeriod.WEEKLY, Currency.USD),
+        (BudgetPeriod.MONTHLY, Currency.GBP),
+    ]:
+        BudgetService.create_budget(
+            user.id, BudgetCreate(
+                category="food", limit="100.00", period=period,
+                currency=currency,
+            ), db_session,
+        )
+    BudgetService.create_budget(
+        other.id, BudgetCreate(category="travel", limit="100.00"), db_session
+    )
+    date = datetime(2026, 10, 6, 12)
+    for currency in ["USD", "EUR", "EUR"]:
+        _add_transaction(
+            db_session, user, category=" Food ", amount=Decimal("20.00"),
+            created_at=date, currency=currency,
+        )
+    for owner, category, kind in [
+        (user, "travel", TransactionType.EXPENSE),
+        (user, None, TransactionType.EXPENSE),
+        (other, "food", TransactionType.EXPENSE),
+        (user, "food", TransactionType.INCOME),
+        (user, "food", TransactionType.CONVERSION),
+    ]:
+        _add_transaction(
+            db_session, owner, category=category, amount=Decimal("999.00"),
+            created_at=date, transaction_type=kind,
+        )
+    stats = BudgetService.get_budget_statistics(
+        user.id, db_session, as_of=datetime(2026, 10, 7, tzinfo=timezone.utc)
+    )
+    assert stats["currency"] == Currency.EUR
+    assert stats["total_spent"] == Decimal("50.00")
+
+
+def test_statistics_without_budgets_do_not_include_unbudgeted_expenses(
+    db_session,
+):
+    user = _create_user(db_session)
+    _add_transaction(
+        db_session, user, category="food", amount=Decimal("25.00"),
+        created_at=datetime(2026, 10, 6, 12),
+    )
+    stats = BudgetService.get_budget_statistics(
+        user.id, db_session, as_of=datetime(2026, 10, 7, tzinfo=timezone.utc)
+    )
+    assert stats["total_budgets"] == 0
+    assert stats["total_spent"] == Decimal("0")
+    assert stats["total_limit"] == Decimal("0")
+    assert stats["total_remaining"] == Decimal("0")
+
+
 def test_monthly_budget_spending_uses_calendar_month(db_session):
     user = _create_user(db_session)
     budget = BudgetService.create_budget(
@@ -409,6 +533,13 @@ def test_budget_api_returns_spending_aggregated_from_transactions(client):
         headers=headers,
     )
     assert budget.status_code == 201, budget.text
+
+    weekly_budget = client.post(
+        "/api/v1/budgets/create",
+        json={"category": "food", "limit": "100.00", "period": "weekly"},
+        headers=headers,
+    )
+    assert weekly_budget.status_code == 201, weekly_budget.text
 
     income = client.post(
         "/api/v1/transactions/",

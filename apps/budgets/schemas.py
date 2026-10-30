@@ -83,10 +83,25 @@ class BudgetStatusCounts(BaseModel):
 class BudgetStatisticsResponse(BaseModel):
     total_budgets: int = Field(..., description="Total number of budgets")
     currency: Currency = Field(..., description="Currency for totals")
-    total_limit: Decimal = Field(..., description="Combined budget limit")
-    total_spent: Decimal = Field(..., description="Combined spent amount")
+    total_limit: Decimal = Field(
+        ..., description="Sum of all budget limits converted to EUR"
+    )
+    total_spent: Decimal = Field(
+        ...,
+        description=(
+            "Expenses covered by at least one of the user's budgets in its "
+            "current UTC calendar period, counted once and converted "
+            "directly from transaction currencies to EUR. Excludes "
+            "unbudgeted expenses; zero when there are no budgets."
+        ),
+    )
     total_remaining: Decimal = Field(
-        ..., description="Combined remaining amount"
+        ...,
+        description=(
+            "Sum of remaining allowances for each budget, converted to EUR. "
+            "Overlapping budgets are independent, so this need not equal "
+            "total_limit minus total_spent."
+        ),
     )
     status_counts: BudgetStatusCounts = Field(
         ..., description="Budget counts by status"
