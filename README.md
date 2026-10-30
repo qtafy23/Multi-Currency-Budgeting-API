@@ -111,7 +111,10 @@ docker compose -f docker-compose.dev.yml down
 
 ### Testing environment
 
-The project uses pytest fixtures from [tests/conftest.py](tests/conftest.py). Shared fixtures create isolated database state per test and override the app DB dependency, so test runs do not mutate development or production data.
+Most tests use the isolated SQLite fixtures from
+[tests/conftest.py](tests/conftest.py). PostgreSQL concurrency tests use separate
+connections and a fresh temporary schema per test, without modifying existing
+application tables. The test database role must be able to create schemas.
 
 For a quick project-level shortcut:
 
@@ -126,6 +129,22 @@ docker compose -f docker-compose.test.yml run --rm api python -m pytest tests/te
 docker compose -f docker-compose.test.yml run --rm api python -m pytest tests/test_transactions.py -q
 docker compose -f docker-compose.test.yml run --rm api python -m pytest tests/test_budgets.py -q
 ```
+
+The test Compose stack sets `TEST_POSTGRES_URL` and waits for PostgreSQL to be
+ready, so its full test command includes the concurrency checks. To run just
+those checks:
+
+```bash
+docker compose -f docker-compose.test.yml run --build --rm api python -m pytest tests/test_transactions_concurrency.py -q
+```
+
+For native runs, set `TEST_POSTGRES_URL` to a PostgreSQL test database. When it is
+unset, the five concurrency cases are explicitly skipped. An unreachable or
+invalid configured database fails the tests. These tests use PostgreSQL's default
+`READ COMMITTED` isolation, force requests to overlap, and verify actual blocking
+via `pg_blocking_pids`, HTTP responses, persisted balances and transaction counts.
+They cover simultaneous expenses with sufficient/insufficient funds, a shared
+key for the same request, and conflicting payloads on the same/different accounts.
 
 ### Production environment
 

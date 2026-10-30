@@ -170,6 +170,15 @@ class TransactionService:
                     db,
                 )
 
+            existing = TransactionService.find_idempotent_transaction(
+                db, user_id, idempotency_key
+            )
+            if existing:
+                TransactionService.validate_idempotent_request(
+                    existing, payload
+                )
+                return existing, False
+
             new_balance = TransactionService.calculate_new_balance(
                 current_balance, payload.type, converted_amount
             )
