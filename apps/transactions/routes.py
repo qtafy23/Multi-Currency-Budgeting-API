@@ -19,7 +19,7 @@ router = APIRouter(prefix="/transactions", tags=["Transactions"])
 def create_transaction(
     payload: TransactionCreate,
     response: Response,
-    idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key"),
+    idempotency_key: str = Header(..., alias="Idempotency-Key"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> TransactionResponse:

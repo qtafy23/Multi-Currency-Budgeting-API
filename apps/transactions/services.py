@@ -47,25 +47,44 @@ class TransactionService:
     def find_idempotent_transaction(
         db: Session,
         user_id: int,
-        external_id: Optional[str],
         idempotency_key: Optional[str],
     ) -> Optional[Transaction]:
-        """Find an existing transaction by external_id or idempotency_key."""
-        query = (
+        """Find an existing transaction by idempotency_key."""
+        if idempotency_key is None:
+            return None
+
+        return (
             db.query(Transaction)
             .join(Account)
-            .filter(Account.user_id == user_id)
+            .filter(
+                Account.user_id == user_id,
+                Transaction.idempotency_key == idempotency_key,
+            )
+            .first()
         )
 
-        if idempotency_key is not None:
-            return query.filter(
-                Transaction.idempotency_key == idempotency_key
-            ).first()
+    @staticmethod
+    def validate_idempotent_request(
+        existing: Transaction,
+        payload: TransactionCreate,
+    ) -> None:
+        """Validate that the repeated request matches the original."""
 
-        if external_id is not None:
-            return query.filter(Transaction.external_id == external_id).first()
-
-        return None
+        if (
+            existing.account_id != payload.account_id
+            or existing.type != payload.type
+            or existing.original_amount != payload.amount
+            or existing.original_currency != payload.currency
+            or existing.category != payload.category
+            or existing.note != payload.note
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    "Idempotency-Key has already been used "
+                    "with different transaction parameters"
+                ),
+            )
 
     @staticmethod
     def calculate_new_balance(
@@ -106,16 +125,18 @@ class TransactionService:
                     "to convert an account balance"
                 ),
             )
-        
+
         existing = TransactionService.find_idempotent_transaction(
-            db, user_id, payload.external_id, idempotency_key
+            db, user_id, idempotency_key
         )
+
         if existing:
+            TransactionService.validate_idempotent_request(
+                existing, payload
+            )
             logger.debug(
-                "Idempotency hit: "
-                "user_id=%s external_id=%s idempotency_key=%s",
+                "Idempotency hit: user_id=%s idempotency_key=%s",
                 user_id,
-                payload.external_id,
                 idempotency_key,
             )
             return existing, False
@@ -165,7 +186,6 @@ class TransactionService:
 
             transaction = Transaction(
                 account_id=account.id,
-                external_id=payload.external_id,
                 idempotency_key=idempotency_key,
                 type=payload.type,
                 original_amount=original_amount,
@@ -193,27 +213,26 @@ class TransactionService:
             )
             return transaction, True
 
-        except IntegrityError:
+        except IntegrityError as exc:
             db.rollback()
+
             existing = TransactionService.find_idempotent_transaction(
-                db, user_id, payload.external_id, idempotency_key
+                db, user_id, idempotency_key
             )
 
             if existing:
-                logger.debug(
-                    "Idempotency conflict resolved by returning "
-                    "existing transaction: "
-                    "user_id=%s external_id=%s idempotency_key=%s",
-                    user_id,
-                    payload.external_id,
-                    idempotency_key,
+                TransactionService.validate_idempotent_request(
+                    existing, payload
                 )
                 return existing, False
 
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Idempotency conflict",
-            )
+            if idempotency_key is not None:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Transaction conflict",
+                ) from exc
+
+            raise
 
     @staticmethod
     def get_user_transactions(user_id: int, db: Session) -> list[Transaction]:

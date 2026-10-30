@@ -12,13 +12,16 @@ class TransactionCreate(BaseModel):
     account_id: int = Field(
         ..., description="ID of the account to apply the transaction"
     )
-    external_id: Optional[str] = Field(
-        None, description="Optional external transaction identifier"
-    )
     type: TransactionType = Field(
         ..., description="Transaction type: income or expense"
     )
-    amount: Decimal = Field(..., gt=0, description="Transaction amount")
+    amount: Decimal = Field(
+        ...,
+        gt=0,
+        max_digits=12,
+        decimal_places=2,
+        description="Transaction amount"
+    )
     currency: Currency = Field(
         ..., description="Currency code for the incoming transaction"
     )
@@ -31,7 +34,6 @@ class TransactionCreate(BaseModel):
         json_schema_extra = {
             "example": {
                 "account_id": 1,
-                "external_id": "txn_20260511_001",
                 "type": "expense",
                 "amount": 150.00,
                 "currency": "USD",
@@ -43,9 +45,6 @@ class TransactionCreate(BaseModel):
 class TransactionResponse(BaseModel):
     id: int = Field(..., description="Transaction ID")
     account_id: int = Field(..., description="ID of the account")
-    external_id: Optional[str] = Field(
-        None, description="Unique external transaction identifier"
-    )
     type: TransactionType = Field(..., description="Transaction type")
     original_amount: Optional[Decimal] = Field(
         None,
@@ -85,7 +84,6 @@ class TransactionResponse(BaseModel):
             "example": {
                 "id": 1,
                 "account_id": 1,
-                "external_id": "txn_20260511_001",
                 "type": "income",
                 "original_amount": 500.00,
                 "converted_amount": 500.00,
