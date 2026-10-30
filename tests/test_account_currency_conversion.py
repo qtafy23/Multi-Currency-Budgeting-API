@@ -47,12 +47,13 @@ def test_convert_account_currency(db_session):
     )
     db_session.commit()
 
-    transaction = AccountService.convert_currency(
+    result = AccountService.convert_currency(
         account_id=account.id,
         user_id=user.id,
         target_currency=Currency.EUR,
         db=db_session,
     )
+    transaction = result["transaction"]
 
     db_session.refresh(account)
 

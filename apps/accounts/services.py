@@ -95,6 +95,7 @@ class AccountService:
             account.currency = target_currency.value
 
             transaction = Transaction(
+                user_id=account.user_id,
                 account_id=account.id,
                 type=TransactionType.CONVERSION,
                 original_amount=old_balance,

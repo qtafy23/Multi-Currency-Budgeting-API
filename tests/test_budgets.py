@@ -43,6 +43,7 @@ def _add_transaction(
     db_session.flush()
     db_session.add(
         Transaction(
+            user_id=user.id,
             account_id=account.id,
             type=transaction_type,
             amount=amount,
@@ -417,7 +418,7 @@ def test_budget_api_returns_spending_aggregated_from_transactions(client):
             "amount": "100.00",
             "currency": "EUR",
         },
-        headers=headers,
+        headers={**headers, "Idempotency-Key": "budget-income"},
     )
     assert income.status_code == 201, income.text
 
@@ -430,7 +431,7 @@ def test_budget_api_returns_spending_aggregated_from_transactions(client):
             "currency": "EUR",
             "category": " Food ",
         },
-        headers=headers,
+        headers={**headers, "Idempotency-Key": "budget-expense"},
     )
     assert transaction.status_code == 201, transaction.text
 

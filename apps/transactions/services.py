@@ -55,9 +55,8 @@ class TransactionService:
 
         return (
             db.query(Transaction)
-            .join(Account)
             .filter(
-                Account.user_id == user_id,
+                Transaction.user_id == user_id,
                 Transaction.idempotency_key == idempotency_key,
             )
             .first()
@@ -185,6 +184,7 @@ class TransactionService:
             account.balance = new_balance
 
             transaction = Transaction(
+                user_id=account.user_id,
                 account_id=account.id,
                 idempotency_key=idempotency_key,
                 type=payload.type,

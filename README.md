@@ -175,6 +175,17 @@ tokens for that user; already-issued access tokens remain valid only until their
 short expiration.
 
 ## Database and migrations
+Transaction `Idempotency-Key` values are unique per user across all their
+accounts. Different users may reuse the same key. Repeating a request with the
+same key and parameters returns the original transaction; changing parameters
+returns HTTP 409. The API requires this header. Internal transactions without
+a key (such as currency conversions) may coexist for the same user.
+
+Apply migrations before starting updated application processes. The migration
+backfills transaction owners from their accounts and replaces the global key
+index with a unique `(user_id, idempotency_key)` constraint. Downgrading requires
+keys to be globally unique again; if users have reused keys, the downgrade fails
+without deleting transactions.
 
 The project uses Alembic.
 

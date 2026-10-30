@@ -8,6 +8,7 @@ from sqlalchemy import (
     Integer,
     Numeric,
     String,
+    UniqueConstraint,
 )
 
 from core.constants.currency import Currency
@@ -19,9 +20,10 @@ class Transaction(Base):
     __tablename__ = "transactions"
 
     id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     account_id = Column(Integer, ForeignKey("accounts.id"), nullable=False)
     external_id = Column(String, nullable=True, unique=True, index=True)
-    idempotency_key = Column(String, nullable=True, unique=True, index=True)
+    idempotency_key = Column(String, nullable=True)
     type = Column(Enum(TransactionType), nullable=False)
     original_amount = Column(Numeric(12, 2), nullable=True)
     converted_amount = Column(Numeric(12, 2), nullable=True)
@@ -34,6 +36,13 @@ class Transaction(Base):
     category = Column(String, nullable=True, index=True)
     note = Column(String, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (
+            UniqueConstraint(
+              "user_id", "idempotency_key",
+              name="uq_transactions_user_id_idempotency_key",
+            ),
+        )
 
     def __repr__(self) -> str:
         return (
