@@ -122,6 +122,20 @@ For a quick project-level shortcut:
 docker compose -f docker-compose.test.yml run --build --rm api python -m pytest -q
 ```
 
+The test Compose environment sets `TEST_DATABASE_URL` automatically, so this
+command includes PostgreSQL integration tests. To run only these tests:
+
+```bash
+make test-integration
+# Or directly:
+docker compose -f docker-compose.test.yml run --build --rm api python -m pytest -m postgres -q
+```
+
+These tests verify concurrent expenses, concurrent incomes, idempotency races,
+and balance rollback on an insert failure. They check actual PostgreSQL lock
+waits with separate sessions. Tables are created from SQLAlchemy metadata;
+this suite does not validate Alembic migrations.
+
 Run a specific file:
 
 ```bash
@@ -352,7 +366,8 @@ Primary auth endpoints are exposed via FastAPI docs and the application login fl
 ## Tests
 
 Tests live under [tests](tests). Pytest automatically loads [tests/conftest.py](tests/conftest.py),
-which provides an isolated in-memory database and FastAPI dependency overrides. Use the test
+which provides an isolated in-memory database and FastAPI dependency overrides.
+PostgreSQL fixtures live in `tests/integration/conftest.py`. Use the test
 commands in the Testing environment section above.
 
 ## Useful commands

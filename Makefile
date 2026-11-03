@@ -1,19 +1,20 @@
 # Project shortcuts
-.PHONY: help dev test lint format db-status migrate seed prod down
+.PHONY: help dev test test-integration lint format db-status migrate seed prod down
 
 PYTHON_SOURCES = apps core scripts tests alembic main.py
 
 help:
 	@echo "Available targets:"
-	@echo "  make dev         Start the development Compose stack"
-	@echo "  make test        Run pytest in the test Compose environment"
-	@echo "  make lint        Run flake8"
-	@echo "  make format      Format Python and sort imports"
-	@echo "  make db-status   Show dev database migration status"
-	@echo "  make migrate     Apply dev database migrations"
-	@echo "  make seed        Insert demo data into the dev database"
-	@echo "  make prod        Start the production Compose stack"
-	@echo "  make down        Stop the development Compose stack"
+	@echo "  make dev         		Start the development Compose stack"
+	@echo "  make test        		Run pytest in the test Compose environment"
+	@echo "  make test-integration 	Run PostgreSQL concurrency tests"
+	@echo "  make lint        		Run flake8"
+	@echo "  make format      		Format Python and sort imports"
+	@echo "  make db-status   		Show dev database migration status"
+	@echo "  make migrate     		Apply dev database migrations"
+	@echo "  make seed        		Insert demo data into the dev database"
+	@echo "  make prod        		Start the production Compose stack"
+	@echo "  make down        		Stop the development Compose stack"
 
 # Docker Compose workflows
 dev:
@@ -23,6 +24,10 @@ dev:
 test:
 	@echo "Running tests in the test container..."
 	docker compose -f docker-compose.test.yml run --build --rm api python -m pytest -q
+
+test-integration:
+	@echo "Running PostgreSQL integration tests..."
+	docker compose -f docker-compose.test.yml run --build --rm api python -m pytest -m postgres -q
 
 prod:
 	@echo "Starting production stack..."
