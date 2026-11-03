@@ -122,7 +122,16 @@ def test_weekly_budget_spending_sums_only_current_week_expenses(db_session):
     assert spent == Decimal("50.00")
 
 
-def test_budget_spending_is_converted_to_budget_currency(db_session):
+def test_budget_spending_is_converted_to_budget_currency(db_session, monkeypatch):
+    as_of = datetime(2026, 10, 7, 12, tzinfo=timezone.utc)
+
+    class FixedDateTime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return as_of.astimezone(tz) if tz else as_of.replace(tzinfo=None)
+
+    monkeypatch.setattr("apps.budgets.services.datetime", FixedDateTime)
+    
     user = _create_user(db_session)
     budget = BudgetService.create_budget(
         user.id,
@@ -161,7 +170,7 @@ def test_budget_spending_is_converted_to_budget_currency(db_session):
         user.id,
         budget,
         db_session,
-        as_of=datetime(2026, 10, 7, 12, tzinfo=timezone.utc),
+        as_of=as_of,
     )
 
     assert budget.currency == Currency.USD.value

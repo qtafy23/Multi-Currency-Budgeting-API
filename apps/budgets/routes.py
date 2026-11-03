@@ -12,6 +12,7 @@ from apps.budgets.schemas import (
     BudgetUpdate,
 )
 from apps.budgets.services import BudgetService
+from apps.exchange.schemas import EXCHANGE_RATE_FAILURE_RESPONSES
 from apps.users.models import User
 from apps.users.routes import get_current_user, get_db
 
@@ -21,6 +22,7 @@ router = APIRouter(prefix="/budgets", tags=["Budgets"])
 @router.post(
     "/create",
     response_model=BudgetResponse,
+    responses=EXCHANGE_RATE_FAILURE_RESPONSES,
     status_code=status.HTTP_201_CREATED,
 )
 def create_budget(
@@ -32,7 +34,11 @@ def create_budget(
     return BudgetService.serialize_budget(current_user.id, budget, db)
 
 
-@router.get("/", response_model=List[BudgetResponse])
+@router.get(
+    "/",
+    response_model=List[BudgetResponse],
+    responses=EXCHANGE_RATE_FAILURE_RESPONSES,
+)
 def list_budgets(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -44,7 +50,11 @@ def list_budgets(
     ]
 
 
-@router.get("/statistics", response_model=BudgetStatisticsResponse)
+@router.get(
+    "/statistics",
+    response_model=BudgetStatisticsResponse,
+    responses=EXCHANGE_RATE_FAILURE_RESPONSES,
+)
 def budget_statistics(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -53,7 +63,11 @@ def budget_statistics(
     return BudgetStatisticsResponse(**stats)
 
 
-@router.get("/{budget_id}", response_model=BudgetResponse)
+@router.get(
+    "/{budget_id}",
+    response_model=BudgetResponse,
+    responses=EXCHANGE_RATE_FAILURE_RESPONSES,
+)
 def get_budget(
     budget_id: int,
     current_user: User = Depends(get_current_user),
@@ -63,7 +77,11 @@ def get_budget(
     return BudgetService.serialize_budget(current_user.id, budget, db)
 
 
-@router.put("/{budget_id}", response_model=BudgetResponse)
+@router.put(
+    "/{budget_id}",
+    response_model=BudgetResponse,
+    responses=EXCHANGE_RATE_FAILURE_RESPONSES,
+)
 def update_budget(
     budget_id: int,
     payload: BudgetUpdate,
@@ -91,7 +109,11 @@ def delete_budget(
     return {"detail": "Budget deleted successfully"}
 
 
-@router.post("/check", response_model=List[BudgetCheckResponse])
+@router.post(
+    "/check",
+    response_model=List[BudgetCheckResponse],
+    responses=EXCHANGE_RATE_FAILURE_RESPONSES,
+)
 def check_budget(
     payload: BudgetCheckRequest,
     current_user: User = Depends(get_current_user),

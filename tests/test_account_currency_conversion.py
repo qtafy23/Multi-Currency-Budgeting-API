@@ -119,7 +119,8 @@ def test_convert_without_exchange_rate_fails(db_session):
             db=db_session,
         )
 
-    assert exc.value.status_code == 404
+    assert exc.value.status_code == 503
+    assert exc.value.detail["code"] == "exchange_rate_unavailable"
     assert account.balance == Decimal("1000.00")
     assert account.currency == Currency.USD.value
     assert db_session.query(Transaction).count() == 0

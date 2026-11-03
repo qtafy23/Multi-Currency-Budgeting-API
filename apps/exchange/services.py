@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Dict, Optional
 
@@ -8,6 +9,7 @@ from requests.exceptions import RequestException
 from sqlalchemy.orm import Session
 
 from apps.exchange.models import ExchangeRate
+from core.config.settings import settings
 from core.constants.currency import (
     EXCHANGE_BASE_CURRENCY,
     FRANKFURTER_RATES_URL,
@@ -28,7 +30,7 @@ class ExchangeRateService:
     def get_rate(
         db: Session, from_currency: Currency, to_currency: Currency
     ) -> ExchangeRate:
-        """Retrieve exchange rate from database."""
+        """Retrieve a usable rate, or report an unavailable dependency."""
         rate = (
             db.query(ExchangeRate)
             .filter(
@@ -39,9 +41,37 @@ class ExchangeRateService:
         )
         if not rate:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Exchange rate from {
-                    from_currency} to {to_currency} not found",
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail={
+                    "code": "exchange_rate_unavailable",
+                    "message": "Required exchange rate is unavailable",
+                    "from_currency": from_currency.value,
+                    "to_currency": to_currency.value,
+                    "updated_at": None,
+                }
+            )
+        updated_at = rate.updated_at
+        if updated_at is not None:
+            updated_at = (
+                updated_at.replace(tzinfo=timezone.utc)
+                if updated_at.tzinfo is None
+                else updated_at.astimezone(timezone.utc)
+            )
+        expires_before = datetime.now(timezone.utc) - timedelta(
+            hours=settings.exchange_rate_max_age_hours
+        )
+        if updated_at is None or updated_at <= expires_before:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail={
+                    "code": "exchange_rate_stale",
+                    "message": "Required exchange rate has expired",
+                    "from_currency": from_currency.value,
+                    "to_currency": to_currency.value,
+                    "updated_at": (
+                        updated_at.isoformat() if updated_at else None
+                    ),
+                },
             )
         return rate
 
@@ -189,63 +219,60 @@ class ExchangeRateService:
         if eur_rates is None:
             raise RuntimeError("Frankfurter rate fetch failed")
 
+        # Validate a complete snapshot before changing any cached pairs.
+        if any(
+            currency.value not in eur_rates for currency in target_currencies
+        ):
+            raise RuntimeError(
+                "Frankfurter response is missing required quotes"
+            )
+        if any(
+            not value.is_finite() or value <= 0
+            for value in eur_rates.values()
+        ):
+            raise RuntimeError("Frankfurter response contains an invalid rate")
         normalized_rates = {
-            Currency(code): rate for code, rate in eur_rates.items()
+            base_currency: Decimal("1"),
+            **{Currency(code): rate for code, rate in eur_rates.items()},
         }
+        pairs = []
+        for source in supported_currencies:
+            for target in supported_currencies:
+                if source == target:
+                    continue
+                value = (normalized_rates[target] / normalized_rates[source])
+                canonical_rate = value.quantize(
+                    Decimal("0.00000001"), rounding=ROUND_HALF_UP
+                )
+                if not 0 < canonical_rate < Decimal("10000000000"):
+                    raise RuntimeError("Frankfurter rate is out of range")
+                pairs.append((source, target, canonical_rate))
+        refreshed_at = datetime.now(timezone.utc).replace(tzinfo=None)
         total_count = 0
         updated_count = 0
         created_count = 0
 
-        for from_currency in supported_currencies:
-            for to_currency in supported_currencies:
-                if from_currency == to_currency:
-                    continue
-
-                if from_currency == base_currency:
-                    rate_value = normalized_rates.get(to_currency)
-                elif to_currency == base_currency:
-                    base_rate = normalized_rates.get(from_currency)
-                    rate_value = (
-                        Decimal("1") / base_rate if base_rate else None
-                    )
-                else:
-                    base_rate = normalized_rates.get(from_currency)
-                    target_rate = normalized_rates.get(to_currency)
-                    rate_value = target_rate / base_rate if base_rate else None
-
-                if rate_value is None:
-                    logger.warning(
-                        "Frankfurter response is missing "
-                        "the EUR-based quote needed for %s -> %s",
-                        from_currency.value,
-                        to_currency.value,
-                    )
-                    continue
-
-                canonical_rate = rate_value.quantize(
-                    Decimal("0.00000001"), rounding=ROUND_HALF_UP
+        for from_currency, to_currency, canonical_rate in pairs:
+            existing_rate = (
+                db.query(ExchangeRate)
+                .filter(
+                    ExchangeRate.from_currency == from_currency,
+                    ExchangeRate.to_currency == to_currency,
                 )
-                existing_rate = (
-                    db.query(ExchangeRate)
-                    .filter(
-                        ExchangeRate.from_currency == from_currency,
-                        ExchangeRate.to_currency == to_currency,
-                    )
-                    .first()
-                )
-
-                if existing_rate:
-                    existing_rate.rate = canonical_rate
-                    updated_count += 1
-                else:
-                    db.add(
-                        ExchangeRate(
-                            from_currency=from_currency,
-                            to_currency=to_currency,
-                            rate=canonical_rate,
-                        )
-                    )
-                    created_count += 1
+                .first()
+            )
+            if existing_rate:
+                existing_rate.rate = canonical_rate
+                existing_rate.updated_at = refreshed_at
+                updated_count += 1
+            else:
+                db.add(ExchangeRate(
+                    from_currency=from_currency,
+                    to_currency=to_currency,
+                    rate=canonical_rate,
+                    updated_at=refreshed_at,
+                ))
+                created_count += 1
 
         db.commit()
         total_count = updated_count + created_count

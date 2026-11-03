@@ -26,10 +26,10 @@ class ExchangeRate(Base):
     to_currency = Column(Enum(Currency), nullable=False)
     rate = Column(Numeric(18, 8), nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    # Last successful provider refresh in UTC, even for unchanged quotes.
     updated_at = Column(
         DateTime,
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
+        default=lambda: datetime.now(timezone.utc).replace(tzinfo=None),
     )
 
     def __repr__(self) -> str:

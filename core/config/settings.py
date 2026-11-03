@@ -35,6 +35,7 @@ class Settings(BaseSettings):
 
     # Exchange Rate Settings
     exchange_rate_update_interval_minutes: int = Field(default=1440)
+    exchange_rate_max_age_hours: int = Field(default=48, gt=0)
 
     # Security Settings
     secret_key: str = Field(default="your-secret-key-change-in-production")

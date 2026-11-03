@@ -243,6 +243,10 @@ class TransactionService:
 
             raise
 
+        except HTTPException:
+            db.rollback()
+            raise
+
     @staticmethod
     def get_user_transactions(user_id: int, db: Session) -> list[Transaction]:
         """Retrieve all transactions for user's accounts."""

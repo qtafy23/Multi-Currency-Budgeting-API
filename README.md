@@ -303,6 +303,40 @@ The system then derives the remaining pairs from EUR-based rates, for example:
 - USD -> GBP is calculated from EUR -> GBP and EUR -> USD
 - all global pair rates are stored in the database
 
+Conversions use cached rates; monetary requests do not call Frankfurter
+synchronously. `EXCHANGE_RATE_MAX_AGE_HOURS` is a positive integer, defaulting to
+48. A rate expires when the time since `updated_at` reaches that threshold.
+Timestamps without timezone information are interpreted as UTC; a missing
+timestamp is treated as expired. Existing old/undated rates need a successful
+background refresh before they can be used again.
+
+`updated_at` records the last successful provider refresh, including responses
+whose values did not change. It is not the provider's quote date: a successful
+weekend refresh can confirm the same quote. The refresher validates all required
+quotes before writing any pairs. Failed requests, missing quotes, non-finite or
+non-positive rates leave cached values and freshness timestamps unchanged.
+
+When a calculation needs an unavailable rate, the API returns HTTP 503 with a
+structured `detail` object containing `code`, `message`, `from_currency`,
+`to_currency` and `updated_at`:
+
+- `exchange_rate_unavailable`: the required pair is absent;
+- `exchange_rate_stale`: the pair exists but its refresh time is expired/unknown.
+
+Financial operations that fail this check leave balances unchanged and create
+no transaction. Budget checks can also require a rate even when the transaction
+and account currencies match. Statistics return 503 if a required conversion
+cannot be completed, rather than skipping expenses or returning a partial total.
+Amounts that need no conversion work without exchange rates. Completed requests
+replayed with the same idempotency key return the original transaction even if
+its rate subsequently expires or disappears. Changing a zero-balance account's
+currency does not require a monetary conversion or a rate.
+
+The read-only exchange-rate endpoints still expose expired records for
+inspection; requesting an absent rate resource by ID returns 404. These response
+contracts are described in OpenAPI. The policy uses the existing `updated_at`
+column and needs no database migration.
+
 Supported currencies:
 
 - EUR

@@ -3,6 +3,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, Header, Response, status
 from sqlalchemy.orm import Session
 
+from apps.exchange.schemas import EXCHANGE_RATE_FAILURE_RESPONSES
 from apps.transactions.schemas import TransactionCreate, TransactionResponse
 from apps.transactions.services import TransactionService
 from apps.users.models import User
@@ -15,6 +16,7 @@ router = APIRouter(prefix="/transactions", tags=["Transactions"])
     "/",
     response_model=TransactionResponse,
     status_code=status.HTTP_201_CREATED,
+    responses=EXCHANGE_RATE_FAILURE_RESPONSES,
 )
 def create_transaction(
     payload: TransactionCreate,

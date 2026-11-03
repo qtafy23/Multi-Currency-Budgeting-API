@@ -1,10 +1,30 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, Literal
 
 from pydantic import BaseModel, Field
 
 from core.constants.currency import Currency
+
+
+class ExchangeRateErrorDetail(BaseModel):
+    code: Literal["exchange_rate_unavailable", "exchange_rate_stale"]
+    message: str
+    from_currency: Currency
+    to_currency: Currency
+    updated_at: Optional[datetime] = None
+
+
+class ExchangeRateErrorResponse(BaseModel):
+    detail: ExchangeRateErrorDetail
+
+
+EXCHANGE_RATE_FAILURE_RESPONSES = {
+    503: {
+        "model": ExchangeRateErrorResponse,
+        "description": "A required exchange rate is missing or expired",
+    },
+}
 
 
 class ExchangeRateResponse(BaseModel):
@@ -22,7 +42,11 @@ class ExchangeRateResponse(BaseModel):
         ..., description="Exchange rate creation timestamp"
     )
     updated_at: Optional[datetime] = Field(
-        None, description="Exchange rate last update timestamp"
+        None,
+        description=(
+            "Last successful provider refresh in UTC, including unchanged "
+            "quotes; not the provider's quote date"
+        ),
     )
 
     class Config:

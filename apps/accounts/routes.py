@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from apps.accounts.models import Account
+from apps.exchange.schemas import EXCHANGE_RATE_FAILURE_RESPONSES
 from apps.accounts.schemas import (
     AccountCreate,
     AccountResponse,
@@ -108,6 +109,7 @@ def update_account(
 @router.post(
     "/{account_id}/convert-currency",
     response_model=AccountCurrencyConversionResponse,
+    responses=EXCHANGE_RATE_FAILURE_RESPONSES,
     status_code=status.HTTP_200_OK,
 )
 def convert_account_currency(
