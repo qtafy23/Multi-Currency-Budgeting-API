@@ -35,6 +35,7 @@ class Transaction(Base):
     currency = Column(String, nullable=False)
     category = Column(String, nullable=True, index=True)
     note = Column(String, nullable=True)
+    budget_warning = Column(String, nullable=True)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (

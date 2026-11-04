@@ -216,9 +216,8 @@ class TransactionService:
                 currency=account.currency,
                 category=payload.category,
                 note=payload.note,
+                budget_warning=budget_warning,
             )
-            if budget_warning:
-                transaction.budget_warning = budget_warning
 
             db.add(transaction)
             db.commit()

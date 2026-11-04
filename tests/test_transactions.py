@@ -3,8 +3,10 @@ from decimal import Decimal
 import pytest
 from fastapi import HTTPException
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from apps.accounts.models import Account
+from apps.budgets.services import BudgetService
 from apps.transactions.models import Transaction
 from apps.transactions.schemas import TransactionCreate
 from apps.transactions.services import TransactionService
@@ -81,6 +83,40 @@ def test_create_transaction_is_idempotent_for_same_key(db_session):
     assert created_second is False
     assert first.id == second.id
     assert db_session.query(Transaction).count() == 1
+
+
+def test_idempotent_retry_preserves_budget_warning(db_session, monkeypatch):
+    user, account = _create_user_and_account(db_session)
+    payload = TransactionCreate(
+        account_id=account.id,
+        type=TransactionType.EXPENSE,
+        amount=Decimal("10.00"),
+        currency=Currency.USD,
+        category="food",
+    )
+    warning = "Budget usage reached 80% for category 'food'"
+    monkeypatch.setattr(
+        BudgetService, "get_expense_budget_warning", lambda *args: warning
+    )
+    first, created = TransactionService.create_transaction(
+        db_session, payload, user.id, "budget-warning-key"
+    )
+
+    assert created is True
+    assert first.budget_warning == warning
+
+    monkeypatch.setattr(
+        BudgetService, "get_expense_budget_warning", lambda *args: None
+    )
+    with Session(db_session.get_bind()) as retry_session:
+        retry, created = TransactionService.create_transaction(
+            retry_session, payload, user.id, "budget-warning-key"
+        )
+
+        assert created is False
+        assert retry.id == first.id
+        assert retry.budget_warning == warning
+        assert retry_session.query(Transaction).count() == 1
 
 
 def test_create_transaction_rejects_insufficient_balance(db_session):
