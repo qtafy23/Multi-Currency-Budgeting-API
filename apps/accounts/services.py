@@ -7,6 +7,7 @@ from apps.accounts.models import Account, AccountEvent
 from apps.exchange.services import ExchangeRateService
 from apps.transactions.models import Transaction
 from core.constants.currency import Currency
+from core.constants.money import MAX_MONEY_AMOUNT
 from core.constants.transaction import TransactionType
 
 
@@ -88,6 +89,11 @@ class AccountService:
                 Decimal("0.01"),
                 rounding=ROUND_HALF_UP,
             )
+            if new_balance.copy_abs() > MAX_MONEY_AMOUNT:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Converted balance exceeds the supported monetary range",
+                )
 
             # Update the account and preserve the conversion history.
             account.balance = new_balance

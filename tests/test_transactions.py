@@ -102,6 +102,27 @@ def test_create_transaction_rejects_insufficient_balance(db_session):
     assert "Insufficient account balance" in str(exc.value.detail)
 
 
+def test_create_transaction_rejects_balance_overflow(db_session):
+    max_balance = Decimal("9999999999.99")
+    user, account = _create_user_and_account(db_session, balance=max_balance)
+    payload = TransactionCreate(
+        account_id=account.id,
+        type=TransactionType.INCOME,
+        amount=Decimal("0.01"),
+        currency=Currency.USD,
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        TransactionService.create_transaction(
+            db_session, payload, user.id, "overflow-key"
+        )
+
+    assert exc.value.status_code == 422
+    assert exc.value.detail == "Resulting balance exceeds the supported monetary range"
+    assert account.balance == max_balance
+    assert db_session.query(Transaction).count() == 0
+
+
 def test_key_is_shared_between_accounts_of_one_user(db_session):
     user, first_account = _create_user_and_account(db_session)
     second_account = Account(

@@ -12,6 +12,7 @@ from apps.exchange.services import ExchangeRateService
 from apps.transactions.models import Transaction
 from apps.transactions.schemas import TransactionCreate
 from core.constants.currency import Currency
+from core.constants.money import MAX_MONEY_AMOUNT
 from core.constants.transaction import TransactionType
 
 logger = logging.getLogger(__name__)
@@ -177,9 +178,20 @@ class TransactionService:
                 )
                 return existing, False
 
+            if converted_amount.copy_abs() > MAX_MONEY_AMOUNT:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Converted amount exceeds the supported monetary range",
+                )
+
             new_balance = TransactionService.calculate_new_balance(
                 current_balance, payload.type, converted_amount
             )
+            if new_balance.copy_abs() > MAX_MONEY_AMOUNT:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="Resulting balance exceeds the supported monetary range",
+                )
 
             logger.debug(
                 "Transaction calculation: account_id=%s before=%s after=%s",
