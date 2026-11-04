@@ -8,16 +8,15 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from apps.accounts.models import Account
-from apps.exchange.schemas import EXCHANGE_RATE_FAILURE_RESPONSES
 from apps.accounts.schemas import (
     AccountCreate,
-    AccountResponse,
-    AccountUpdate,
     AccountCurrencyConversionRequest,
     AccountCurrencyConversionResponse,
+    AccountResponse,
+    AccountUpdate,
 )
 from apps.accounts.services import AccountService
-from apps.transactions.schemas import TransactionResponse
+from apps.exchange.schemas import EXCHANGE_RATE_FAILURE_RESPONSES
 from apps.users.models import User
 from apps.users.routes import get_current_user, get_db
 

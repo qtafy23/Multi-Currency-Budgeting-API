@@ -59,9 +59,7 @@ class BudgetService:
         period_start, period_end = BudgetService._period_window(
             budget.period, as_of
         )
-        normalized_category = BudgetService.normalize_category(
-            budget.category
-        )
+        normalized_category = BudgetService.normalize_category(budget.category)
         totals_by_currency = (
             db.query(
                 Transaction.currency,
@@ -242,11 +240,13 @@ class BudgetService:
         windows = []
         for period in BudgetPeriod:
             start, end = BudgetService._period_window(period, as_of)
-            windows.append(and_(
-                Budget.period == period,
-                Transaction.created_at >= start,
-                Transaction.created_at < end,
-            ))
+            windows.append(
+                and_(
+                    Budget.period == period,
+                    Transaction.created_at >= start,
+                    Transaction.created_at < end,
+                )
+            )
         matching_budget = (
             db.query(Budget.id)
             .filter(
@@ -272,14 +272,15 @@ class BudgetService:
         return sum(
             (
                 ExchangeRateService.convert_amount(
-                    db, Currency(currency), EXCHANGE_BASE_CURRENCY,
+                    db,
+                    Currency(currency),
+                    EXCHANGE_BASE_CURRENCY,
                     Decimal(str(amount)),
                 )
                 for currency, amount in totals_by_currency
             ),
             Decimal("0"),
         )
-
 
     @staticmethod
     def get_budget_statistics(
@@ -305,7 +306,8 @@ class BudgetService:
         ]
         total_spent = (
             BudgetService._get_total_budgeted_spending(user_id, db, as_of)
-            if budgets else Decimal("0")
+            if budgets
+            else Decimal("0")
         )
         total_remaining = sum(
             (
@@ -353,9 +355,7 @@ class BudgetService:
 
         response = []
         for budget in budgets:
-            summary = BudgetService.get_budget_summary(
-                user_id, budget, db
-            )
+            summary = BudgetService.get_budget_summary(user_id, budget, db)
             converted_amount = ExchangeRateService.convert_amount(
                 db,
                 currency,
@@ -369,14 +369,16 @@ class BudgetService:
             elif projected_spent >= budget.limit * Decimal("0.8"):
                 warning = "Budget usage has reached 80% of the limit"
 
-            response.append({
-                "category": budget.category,
-                "period": budget.period,
-                "limit": budget.limit,
-                "currency": Currency(budget.currency),
-                **summary,
-                "warning": warning,
-            })
+            response.append(
+                {
+                    "category": budget.category,
+                    "period": budget.period,
+                    "limit": budget.limit,
+                    "currency": Currency(budget.currency),
+                    **summary,
+                    "warning": warning,
+                }
+            )
         return response
 
     @staticmethod
@@ -393,9 +395,7 @@ class BudgetService:
 
         warning: Optional[str] = None
         for budget in budgets:
-            summary = BudgetService.get_budget_summary(
-                user_id, budget, db
-            )
+            summary = BudgetService.get_budget_summary(user_id, budget, db)
             converted_amount = ExchangeRateService.convert_amount(
                 db, currency, Currency(budget.currency), amount
             )

@@ -13,7 +13,9 @@ from core.db import Base
 def postgres_sessions():
     url = os.environ.get("TEST_DATABASE_URL")
     if not url:
-        pytest.skip("Set TEST_DATABASE_URL to run PostgreSQL integration tests")
+        pytest.skip(
+            "Set TEST_DATABASE_URL to run PostgreSQL integration tests"
+        )
     if make_url(url).get_backend_name() != "postgresql":
         pytest.fail("TEST_DATABASE_URL must point to PostgreSQL")
 
@@ -38,5 +40,7 @@ def postgres_sessions():
         if engine is not None:
             engine.dispose()
         with admin.begin() as connection:
-            connection.exec_driver_sql(f'DROP SCHEMA IF EXISTS "{schema}" CASCADE')
+            connection.exec_driver_sql(
+                f'DROP SCHEMA IF EXISTS "{schema}" CASCADE'
+            )
         admin.dispose()

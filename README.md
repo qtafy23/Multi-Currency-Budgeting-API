@@ -162,7 +162,9 @@ key for the same request, and conflicting payloads on the same/different account
 
 ### Production environment
 
-Use the same `.env` file creation step first, then start the stack:
+Create `.env` from the example and set `DEBUG=False` along with the other
+production values before starting the stack. The API, Celery Worker, and Celery
+Beat read `DEBUG` from `.env` and wait for the shared configuration check to pass.
 
 ```bash
 cp .env.example .env

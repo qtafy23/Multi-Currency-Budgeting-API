@@ -7,21 +7,20 @@ Create Date: 2026-10-20 22:01:25.163881
 """
 from typing import Sequence, Union
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = '36e8b384834b'
-down_revision: Union[str, None] = 'd03b7e291c54'
+revision: str = "36e8b384834b"
+down_revision: Union[str, None] = "d03b7e291c54"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
     op.execute(
-        "ALTER TYPE transactiontype "
-        "ADD VALUE IF NOT EXISTS 'CONVERSION'"
+        "ALTER TYPE transactiontype " "ADD VALUE IF NOT EXISTS 'CONVERSION'"
     )
 
     op.add_column(

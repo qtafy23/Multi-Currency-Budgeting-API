@@ -1,4 +1,4 @@
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
@@ -6,7 +6,6 @@ from sqlalchemy.orm import Session
 from apps.accounts.models import Account, AccountEvent
 from apps.exchange.services import ExchangeRateService
 from apps.transactions.models import Transaction
-from apps.users.models import User
 from core.constants.currency import Currency
 from core.constants.transaction import TransactionType
 

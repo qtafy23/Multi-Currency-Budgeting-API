@@ -32,9 +32,7 @@ def test_logout_revokes_refresh_token_but_new_login_can_refresh(client):
     first_login = client.post("/api/v1/auth/login", data=payload)
     assert first_login.status_code == 200, first_login.text
     first_tokens = first_login.json()
-    headers = {
-        "Authorization": f"Bearer {first_tokens['access_token']}"
-    }
+    headers = {"Authorization": f"Bearer {first_tokens['access_token']}"}
 
     logout_response = client.post("/api/v1/auth/logout", headers=headers)
     assert logout_response.status_code == 200, logout_response.text

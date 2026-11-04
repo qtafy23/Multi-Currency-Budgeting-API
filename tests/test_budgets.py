@@ -122,7 +122,9 @@ def test_weekly_budget_spending_sums_only_current_week_expenses(db_session):
     assert spent == Decimal("50.00")
 
 
-def test_budget_spending_is_converted_to_budget_currency(db_session, monkeypatch):
+def test_budget_spending_is_converted_to_budget_currency(
+    db_session, monkeypatch
+):
     as_of = datetime(2026, 10, 7, 12, tzinfo=timezone.utc)
 
     class FixedDateTime(datetime):
@@ -131,7 +133,7 @@ def test_budget_spending_is_converted_to_budget_currency(db_session, monkeypatch
             return as_of.astimezone(tz) if tz else as_of.replace(tzinfo=None)
 
     monkeypatch.setattr("apps.budgets.services.datetime", FixedDateTime)
-    
+
     user = _create_user(db_session)
     budget = BudgetService.create_budget(
         user.id,
@@ -365,7 +367,10 @@ def test_statistics_count_overlapping_budget_expenses_once(db_session):
             db_session,
         )
     _add_transaction(
-        db_session, user, category=" FOOD ", amount=Decimal("25.00"),
+        db_session,
+        user,
+        category=" FOOD ",
+        amount=Decimal("25.00"),
         created_at=datetime(2026, 10, 6, 12),
     )
     stats = BudgetService.get_budget_statistics(
@@ -400,7 +405,10 @@ def test_statistics_use_union_of_current_budget_windows(db_session):
         (datetime(2026, 11, 1), "999.00"),
     ]:
         _add_transaction(
-            db_session, user, category="food", amount=Decimal(amount),
+            db_session,
+            user,
+            category="food",
+            amount=Decimal(amount),
             created_at=created_at,
         )
     stats = BudgetService.get_budget_statistics(
@@ -422,18 +430,26 @@ def test_statistics_convert_unique_expenses_and_keep_user_category_scope(
         (Currency.USD, Currency.GBP, "0.25"),
         (Currency.GBP, Currency.USD, "4"),
     ]:
-        db_session.add(ExchangeRate(
-            from_currency=source, to_currency=target, rate=Decimal(rate),
-        ))
+        db_session.add(
+            ExchangeRate(
+                from_currency=source,
+                to_currency=target,
+                rate=Decimal(rate),
+            )
+        )
     for period, currency in [
         (BudgetPeriod.WEEKLY, Currency.USD),
         (BudgetPeriod.MONTHLY, Currency.GBP),
     ]:
         BudgetService.create_budget(
-            user.id, BudgetCreate(
-                category="food", limit="100.00", period=period,
+            user.id,
+            BudgetCreate(
+                category="food",
+                limit="100.00",
+                period=period,
                 currency=currency,
-            ), db_session,
+            ),
+            db_session,
         )
     BudgetService.create_budget(
         other.id, BudgetCreate(category="travel", limit="100.00"), db_session
@@ -441,8 +457,12 @@ def test_statistics_convert_unique_expenses_and_keep_user_category_scope(
     date = datetime(2026, 10, 6, 12)
     for currency in ["USD", "EUR", "EUR"]:
         _add_transaction(
-            db_session, user, category=" Food ", amount=Decimal("20.00"),
-            created_at=date, currency=currency,
+            db_session,
+            user,
+            category=" Food ",
+            amount=Decimal("20.00"),
+            created_at=date,
+            currency=currency,
         )
     for owner, category, kind in [
         (user, "travel", TransactionType.EXPENSE),
@@ -452,8 +472,12 @@ def test_statistics_convert_unique_expenses_and_keep_user_category_scope(
         (user, "food", TransactionType.CONVERSION),
     ]:
         _add_transaction(
-            db_session, owner, category=category, amount=Decimal("999.00"),
-            created_at=date, transaction_type=kind,
+            db_session,
+            owner,
+            category=category,
+            amount=Decimal("999.00"),
+            created_at=date,
+            transaction_type=kind,
         )
     stats = BudgetService.get_budget_statistics(
         user.id, db_session, as_of=datetime(2026, 10, 7, tzinfo=timezone.utc)
@@ -467,7 +491,10 @@ def test_statistics_without_budgets_do_not_include_unbudgeted_expenses(
 ):
     user = _create_user(db_session)
     _add_transaction(
-        db_session, user, category="food", amount=Decimal("25.00"),
+        db_session,
+        user,
+        category="food",
+        amount=Decimal("25.00"),
         created_at=datetime(2026, 10, 6, 12),
     )
     stats = BudgetService.get_budget_statistics(
@@ -580,8 +607,6 @@ def test_budget_api_returns_spending_aggregated_from_transactions(client):
     assert Decimal(str(budgets.json()[0]["spent_amount"])) == Decimal("80.00")
     assert budgets.json()[0]["status"] == BudgetStatus.WARNING.value
 
-    statistics = client.get(
-        "/api/v1/budgets/statistics", headers=headers
-    )
+    statistics = client.get("/api/v1/budgets/statistics", headers=headers)
     assert statistics.status_code == 200, statistics.text
     assert Decimal(str(statistics.json()["total_spent"])) == Decimal("80.00")

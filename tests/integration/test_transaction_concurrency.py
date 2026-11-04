@@ -21,14 +21,19 @@ pytestmark = pytest.mark.postgres
 def _seed(sessions):
     with sessions() as db:
         user = User(
-            email="concurrency@example.com", hashed_password="unused",
-            is_active=True, is_verified=True,
+            email="concurrency@example.com",
+            hashed_password="unused",
+            is_active=True,
+            is_verified=True,
         )
         db.add(user)
         db.flush()
         account = Account(
-            user_id=user.id, name="Concurrent account",
-            balance=Decimal("100.00"), currency="EUR", is_active=True,
+            user_id=user.id,
+            name="Concurrent account",
+            balance=Decimal("100.00"),
+            currency="EUR",
+            is_active=True,
         )
         db.add(account)
         db.commit()
@@ -37,8 +42,10 @@ def _seed(sessions):
 
 def _payload(account_id, kind, amount):
     return TransactionCreate(
-        account_id=account_id, type=kind,
-        amount=Decimal(amount), currency=Currency.EUR,
+        account_id=account_id,
+        type=kind,
+        amount=Decimal(amount),
+        currency=Currency.EUR,
     )
 
 
@@ -63,7 +70,8 @@ def _concurrent(sessions, monkeypatch, user_id, account_id, payload, keys):
         return result
 
     monkeypatch.setattr(
-        TransactionService, "find_idempotent_transaction",
+        TransactionService,
+        "find_idempotent_transaction",
         staticmethod(synchronized_lookup),
     )
 
@@ -71,7 +79,10 @@ def _concurrent(sessions, monkeypatch, user_id, account_id, payload, keys):
         with sessions() as db:
             try:
                 transaction, created = TransactionService.create_transaction(
-                    db, payload, user_id, key,
+                    db,
+                    payload,
+                    user_id,
+                    key,
                 )
                 return transaction.id, created
             except HTTPException as exc:
@@ -80,7 +91,9 @@ def _concurrent(sessions, monkeypatch, user_id, account_id, payload, keys):
 
     with ThreadPoolExecutor(max_workers=2) as pool:
         with sessions() as holder:
-            holder.query(Account).filter_by(id=account_id).with_for_update().one()
+            holder.query(Account).filter_by(
+                id=account_id
+            ).with_for_update().one()
             futures = [pool.submit(request, key) for key in keys]
             try:
                 deadline = monotonic() + 8
@@ -94,13 +107,15 @@ def _concurrent(sessions, monkeypatch, user_id, account_id, payload, keys):
                                 "FROM unnest(CAST(:pids AS int[])) AS pid "
                                 "WHERE cardinality(pg_blocking_pids(pid)) > 0"
                             ),
-                            {"pids": pids}
+                            {"pids": pids},
                         ).scalar_one()
                         if blocked == 2:
                             break
                         sleep(0.02)
                     else:
-                        pytest.fail("Both requests must wait for the account row lock")
+                        pytest.fail(
+                            "Both requests must wait for the account row lock"
+                        )
             finally:
                 holder.rollback()
         return [future.result(timeout=20) for future in futures]
@@ -117,21 +132,33 @@ def _state(sessions, account_id):
 def test_concurrent_expenses_cannot_overdraw(postgres_sessions, monkeypatch):
     user_id, account_id = _seed(postgres_sessions)
     results = _concurrent(
-        postgres_sessions, monkeypatch, user_id, account_id,
-        _payload(account_id, TransactionType.EXPENSE, "80"), ["expense-1", "expense-2"],
+        postgres_sessions,
+        monkeypatch,
+        user_id,
+        account_id,
+        _payload(account_id, TransactionType.EXPENSE, "80"),
+        ["expense-1", "expense-2"],
     )
-    errors = [result for result in results if isinstance(result, HTTPException)]
+    errors = [
+        result for result in results if isinstance(result, HTTPException)
+    ]
     assert len(errors) == 1
     assert errors[0].status_code == 400
     assert errors[0].detail == "Insufficient account balance"
     assert _state(postgres_sessions, account_id) == (Decimal("20.00"), 1)
 
 
-def test_concurrent_incomes_preserve_both_updates(postgres_sessions, monkeypatch):
+def test_concurrent_incomes_preserve_both_updates(
+    postgres_sessions, monkeypatch
+):
     user_id, account_id = _seed(postgres_sessions)
     results = _concurrent(
-        postgres_sessions, monkeypatch, user_id, account_id,
-        _payload(account_id, TransactionType.INCOME, "30"), ["income-1", "income-2"],
+        postgres_sessions,
+        monkeypatch,
+        user_id,
+        account_id,
+        _payload(account_id, TransactionType.INCOME, "30"),
+        ["income-1", "income-2"],
     )
     assert all(not isinstance(result, HTTPException) for result in results)
     assert all(created for _, created in results)
@@ -139,11 +166,17 @@ def test_concurrent_incomes_preserve_both_updates(postgres_sessions, monkeypatch
     assert _state(postgres_sessions, account_id) == (Decimal("160.00"), 2)
 
 
-def test_concurrent_same_key_changes_balance_once(postgres_sessions, monkeypatch):
+def test_concurrent_same_key_changes_balance_once(
+    postgres_sessions, monkeypatch
+):
     user_id, account_id = _seed(postgres_sessions)
     results = _concurrent(
-        postgres_sessions, monkeypatch, user_id, account_id,
-        _payload(account_id, TransactionType.EXPENSE, "30"), ["same-key", "same-key"],
+        postgres_sessions,
+        monkeypatch,
+        user_id,
+        account_id,
+        _payload(account_id, TransactionType.EXPENSE, "30"),
+        ["same-key", "same-key"],
     )
     assert all(not isinstance(result, HTTPException) for result in results)
     assert sorted(created for _, created in results) == [False, True]
@@ -154,15 +187,19 @@ def test_concurrent_same_key_changes_balance_once(postgres_sessions, monkeypatch
 def test_insert_failure_rolls_back_balance(postgres_sessions):
     user_id, account_id = _seed(postgres_sessions)
     with postgres_sessions() as db:
-        db.execute(text(
-            "ALTER TABLE transactions ADD CONSTRAINT reject_test_amount "
-            "CHECK (amount <> 13)"
-        ))
+        db.execute(
+            text(
+                "ALTER TABLE transactions ADD CONSTRAINT reject_test_amount "
+                "CHECK (amount <> 13)"
+            )
+        )
         db.commit()
         with pytest.raises(HTTPException) as exc:
             TransactionService.create_transaction(
-                db, _payload(account_id, TransactionType.EXPENSE, "13"),
-                user_id, "failed-insert",
+                db,
+                _payload(account_id, TransactionType.EXPENSE, "13"),
+                user_id,
+                "failed-insert",
             )
         assert exc.value.status_code == 409
         # The service has rolled back and the same session is usable again.

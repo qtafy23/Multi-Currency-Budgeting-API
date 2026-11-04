@@ -1,4 +1,4 @@
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import pytest
@@ -8,7 +8,7 @@ from sqlalchemy import text
 from apps.exchange.models import ExchangeRate
 from apps.exchange.services import ExchangeRateService
 from core.config.settings import Settings, settings
-from core.constants.currency import Currency, FRANKFURTER_RATES_URL
+from core.constants.currency import FRANKFURTER_RATES_URL, Currency
 
 
 def test_fetch_from_frankfurter_parses_latest_dict_response(monkeypatch):
@@ -133,11 +133,14 @@ def test_missing_rate_is_a_dependency_error(db_session):
 
 @pytest.mark.parametrize("age_hours", [47, 48, 49])
 def test_rate_expiration_boundary(db_session, rate_now, age_hours):
-    db_session.add(ExchangeRate(
-        from_currency=Currency.USD, to_currency=Currency.EUR,
-        rate=Decimal("0.9"),
-        updated_at=rate_now - timedelta(hours=age_hours),
-    ))
+    db_session.add(
+        ExchangeRate(
+            from_currency=Currency.USD,
+            to_currency=Currency.EUR,
+            rate=Decimal("0.9"),
+            updated_at=rate_now - timedelta(hours=age_hours),
+        )
+    )
     db_session.commit()
     if age_hours < 48:
         assert ExchangeRateService.convert_amount(
@@ -153,10 +156,13 @@ def test_rate_expiration_boundary(db_session, rate_now, age_hours):
 
 
 def test_unknown_refresh_time_is_stale(db_session):
-    db_session.add(ExchangeRate(
-        from_currency=Currency.USD, to_currency=Currency.EUR,
-        rate=Decimal("0.9"),
-    ))
+    db_session.add(
+        ExchangeRate(
+            from_currency=Currency.USD,
+            to_currency=Currency.EUR,
+            rate=Decimal("0.9"),
+        )
+    )
     db_session.commit()
     db_session.execute(text("UPDATE exchange_rates SET updated_at = NULL"))
     db_session.commit()
@@ -168,13 +174,19 @@ def test_unknown_refresh_time_is_stale(db_session):
 
 
 def test_freshness_threshold_is_configurable(
-    db_session, monkeypatch, rate_now,
+    db_session,
+    monkeypatch,
+    rate_now,
 ):
     monkeypatch.setattr(settings, "exchange_rate_max_age_hours", 1)
-    db_session.add(ExchangeRate(
-        from_currency=Currency.USD, to_currency=Currency.EUR,
-        rate=Decimal("0.9"), updated_at=rate_now - timedelta(hours=2),
-    ))
+    db_session.add(
+        ExchangeRate(
+            from_currency=Currency.USD,
+            to_currency=Currency.EUR,
+            rate=Decimal("0.9"),
+            updated_at=rate_now - timedelta(hours=2),
+        )
+    )
     db_session.commit()
     with pytest.raises(HTTPException) as exc:
         ExchangeRateService.get_rate(db_session, Currency.USD, Currency.EUR)
@@ -196,15 +208,22 @@ def test_same_currency_needs_no_rate(db_session):
 
 
 def test_refresh_advances_timestamp_even_if_rate_does_not_change(
-    db_session, monkeypatch, rate_now,
+    db_session,
+    monkeypatch,
+    rate_now,
 ):
-    db_session.add(ExchangeRate(
-        from_currency=Currency.EUR, to_currency=Currency.USD,
-        rate=Decimal("1.1"), updated_at=rate_now - timedelta(days=3),
-    ))
+    db_session.add(
+        ExchangeRate(
+            from_currency=Currency.EUR,
+            to_currency=Currency.USD,
+            rate=Decimal("1.1"),
+            updated_at=rate_now - timedelta(days=3),
+        )
+    )
     db_session.commit()
     monkeypatch.setattr(
-        ExchangeRateService, "fetch_from_frankfurter",
+        ExchangeRateService,
+        "fetch_from_frankfurter",
         lambda *args: {"USD": Decimal("1.1"), "GBP": Decimal("0.8")},
     )
     assert ExchangeRateService.refresh_rates_from_frankfurter(db_session) == 6
@@ -216,21 +235,33 @@ def test_refresh_advances_timestamp_even_if_rate_does_not_change(
     ) == Decimal("11.00")
 
 
-@pytest.mark.parametrize("payload", [
-    None, {}, {"USD": Decimal("1.1")},
-    {"USD": Decimal("1.1"), "GBP": Decimal("0")},
-    {"USD": Decimal("1.1"), "GBP": Decimal("-1")},
-    {"USD": Decimal("1.1"), "GBP": Decimal("NaN")},
-    {"USD": Decimal("1.1"), "GBP": Decimal("Infinity")},
-])
+@pytest.mark.parametrize(
+    "payload",
+    [
+        None,
+        {},
+        {"USD": Decimal("1.1")},
+        {"USD": Decimal("1.1"), "GBP": Decimal("0")},
+        {"USD": Decimal("1.1"), "GBP": Decimal("-1")},
+        {"USD": Decimal("1.1"), "GBP": Decimal("NaN")},
+        {"USD": Decimal("1.1"), "GBP": Decimal("Infinity")},
+    ],
+)
 def test_failed_refresh_preserves_values_and_timestamp(
-    db_session, monkeypatch, rate_now, payload,
+    db_session,
+    monkeypatch,
+    rate_now,
+    payload,
 ):
     previous = rate_now.replace(tzinfo=None) - timedelta(days=3)
-    db_session.add(ExchangeRate(
-        from_currency=Currency.EUR, to_currency=Currency.USD,
-        rate=Decimal("1.1"), updated_at=previous,
-    ))
+    db_session.add(
+        ExchangeRate(
+            from_currency=Currency.EUR,
+            to_currency=Currency.USD,
+            rate=Decimal("1.1"),
+            updated_at=previous,
+        )
+    )
     db_session.commit()
     monkeypatch.setattr(
         ExchangeRateService, "fetch_from_frankfurter", lambda *args: payload
@@ -245,8 +276,10 @@ def test_failed_refresh_preserves_values_and_timestamp(
 
 def test_rate_resource_can_be_inspected_even_when_stale(db_session, rate_now):
     rate = ExchangeRate(
-        from_currency=Currency.USD, to_currency=Currency.EUR,
-        rate=Decimal("0.9"), updated_at=rate_now - timedelta(days=3),
+        from_currency=Currency.USD,
+        to_currency=Currency.EUR,
+        rate=Decimal("0.9"),
+        updated_at=rate_now - timedelta(days=3),
     )
     db_session.add(rate)
     db_session.commit()

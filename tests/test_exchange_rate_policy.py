@@ -17,14 +17,19 @@ from core.constants.transaction import TransactionType
 @pytest.fixture
 def wallet(client, db_session):
     user = User(
-        email="rate-policy@example.com", hashed_password="unused",
-        is_active=True, is_verified=True,
+        email="rate-policy@example.com",
+        hashed_password="unused",
+        is_active=True,
+        is_verified=True,
     )
     db_session.add(user)
     db_session.flush()
     account = Account(
-        user_id=user.id, name="Policy test", balance=Decimal("100.00"),
-        currency="USD", is_active=True,
+        user_id=user.id,
+        name="Policy test",
+        balance=Decimal("100.00"),
+        currency="USD",
+        is_active=True,
     )
     db_session.add(account)
     db_session.commit()
@@ -39,17 +44,22 @@ def seed_rate(db, state, source=Currency.USD, target=Currency.EUR):
     stamp = datetime.now(timezone.utc).replace(tzinfo=None)
     if state == "stale":
         stamp -= timedelta(hours=49)
-    db.add(ExchangeRate(
-        from_currency=source, to_currency=target,
-        rate=Decimal("0.9"), updated_at=stamp,
-    ))
+    db.add(
+        ExchangeRate(
+            from_currency=source,
+            to_currency=target,
+            rate=Decimal("0.9"),
+            updated_at=stamp,
+        )
+    )
     db.commit()
 
 
 def assert_rate_failure(response, state):
     assert response.status_code == 503, response.text
     expected = (
-        "exchange_rate_unavailable" if state == "missing"
+        "exchange_rate_unavailable"
+        if state == "missing"
         else "exchange_rate_stale"
     )
     assert response.json()["detail"]["code"] == expected
@@ -58,7 +68,11 @@ def assert_rate_failure(response, state):
 @pytest.mark.parametrize("state", ["missing", "stale"])
 @pytest.mark.parametrize("operation", ["transaction", "account_conversion"])
 def test_currency_write_failure_preserves_money(
-    client, db_session, wallet, state, operation,
+    client,
+    db_session,
+    wallet,
+    state,
+    operation,
 ):
     if operation == "transaction":
         seed_rate(db_session, state, Currency.EUR, Currency.USD)
@@ -66,8 +80,10 @@ def test_currency_write_failure_preserves_money(
             "/api/v1/transactions/",
             headers={"Idempotency-Key": "failed-conversion"},
             json={
-                "account_id": wallet, "type": "expense",
-                "amount": "10.00", "currency": "EUR",
+                "account_id": wallet,
+                "type": "expense",
+                "amount": "10.00",
+                "currency": "EUR",
             },
         )
     else:
@@ -87,15 +103,20 @@ def test_currency_write_failure_preserves_money(
 
 @pytest.mark.parametrize("state", ["missing", "stale"])
 def test_same_currency_write_needs_no_rate(
-    client, db_session, wallet, state,
+    client,
+    db_session,
+    wallet,
+    state,
 ):
     seed_rate(db_session, state)
     response = client.post(
         "/api/v1/transactions/",
         headers={"Idempotency-Key": "same-currency"},
         json={
-            "account_id": wallet, "type": "expense",
-            "amount": "10.00", "currency": "USD",
+            "account_id": wallet,
+            "type": "expense",
+            "amount": "10.00",
+            "currency": "USD",
         },
     )
     assert response.status_code == 201, response.text
@@ -104,12 +125,16 @@ def test_same_currency_write_needs_no_rate(
 
 
 def test_completed_request_replays_after_rate_expires_or_disappears(
-    client, db_session, wallet,
+    client,
+    db_session,
+    wallet,
 ):
     seed_rate(db_session, "fresh", Currency.EUR, Currency.USD)
     payload = {
-        "account_id": wallet, "type": "expense",
-        "amount": "10.00", "currency": "EUR",
+        "account_id": wallet,
+        "type": "expense",
+        "amount": "10.00",
+        "currency": "EUR",
     }
     headers = {"Idempotency-Key": "completed"}
     first = client.post("/api/v1/transactions/", json=payload, headers=headers)
@@ -133,18 +158,32 @@ def test_completed_request_replays_after_rate_expires_or_disappears(
 
 @pytest.mark.parametrize("state", ["missing", "stale", "fresh"])
 def test_statistics_require_a_usable_rate_for_the_complete_total(
-    client, db_session, wallet, state,
+    client,
+    db_session,
+    wallet,
+    state,
 ):
     account = db_session.get(Account, wallet)
-    db_session.add(Budget(
-        user_id=account.user_id, category="food", limit=Decimal("100.00"),
-        currency="EUR", period=BudgetPeriod.MONTHLY,
-    ))
-    db_session.add(Transaction(
-        user_id=account.user_id, account_id=wallet,
-        type=TransactionType.EXPENSE, amount=Decimal("10.00"),
-        balance_after=Decimal("90.00"), currency="USD", category="food",
-    ))
+    db_session.add(
+        Budget(
+            user_id=account.user_id,
+            category="food",
+            limit=Decimal("100.00"),
+            currency="EUR",
+            period=BudgetPeriod.MONTHLY,
+        )
+    )
+    db_session.add(
+        Transaction(
+            user_id=account.user_id,
+            account_id=wallet,
+            type=TransactionType.EXPENSE,
+            amount=Decimal("10.00"),
+            balance_after=Decimal("90.00"),
+            currency="USD",
+            category="food",
+        )
+    )
     account.balance = Decimal("90.00")
     db_session.commit()
     seed_rate(db_session, state)
@@ -160,21 +199,32 @@ def test_statistics_require_a_usable_rate_for_the_complete_total(
 
 @pytest.mark.parametrize("state", ["missing", "stale"])
 def test_budget_check_failure_also_prevents_same_currency_spending(
-    client, db_session, wallet, state,
+    client,
+    db_session,
+    wallet,
+    state,
 ):
     account = db_session.get(Account, wallet)
-    db_session.add(Budget(
-        user_id=account.user_id, category="food", limit=Decimal("100.00"),
-        currency="EUR", period=BudgetPeriod.MONTHLY,
-    ))
+    db_session.add(
+        Budget(
+            user_id=account.user_id,
+            category="food",
+            limit=Decimal("100.00"),
+            currency="EUR",
+            period=BudgetPeriod.MONTHLY,
+        )
+    )
     db_session.commit()
     seed_rate(db_session, state)
     response = client.post(
         "/api/v1/transactions/",
         headers={"Idempotency-Key": "budget-check"},
         json={
-            "account_id": wallet, "type": "expense", "amount": "10.00",
-            "currency": "USD", "category": "food",
+            "account_id": wallet,
+            "type": "expense",
+            "amount": "10.00",
+            "currency": "USD",
+            "category": "food",
         },
     )
     assert_rate_failure(response, state)
@@ -184,7 +234,9 @@ def test_budget_check_failure_also_prevents_same_currency_spending(
 
 
 def test_zero_balance_currency_change_needs_no_rate(
-    client, db_session, wallet,
+    client,
+    db_session,
+    wallet,
 ):
     account = db_session.get(Account, wallet)
     account.balance = Decimal("0.00")

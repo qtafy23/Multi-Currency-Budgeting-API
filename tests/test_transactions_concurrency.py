@@ -54,24 +54,34 @@ def postgres_api():
             connection.execute(CreateSchema(schema))
         engine = create_engine(
             url,
-            connect_args={"options": (
-                f"-csearch_path={schema} "
-                "-clock_timeout=10000 -cstatement_timeout=15000"
-            )},
+            connect_args={
+                "options": (
+                    f"-csearch_path={schema} "
+                    "-clock_timeout=10000 -cstatement_timeout=15000"
+                )
+            },
         )
         Base.metadata.create_all(engine)
         sessions = sessionmaker(bind=engine)
         with sessions() as db:
             user = User(
-                email="concurrent@example.com", hashed_password="unused",
-                is_active=True, is_verified=True,
+                email="concurrent@example.com",
+                hashed_password="unused",
+                is_active=True,
+                is_verified=True,
             )
             db.add(user)
             db.flush()
-            accounts = [Account(
-                user_id=user.id, name=f"Account {i}", currency="USD",
-                balance=Decimal("100.00"), is_active=True,
-            ) for i in range(2)]
+            accounts = [
+                Account(
+                    user_id=user.id,
+                    name=f"Account {i}",
+                    currency="USD",
+                    balance=Decimal("100.00"),
+                    is_active=True,
+                )
+                for i in range(2)
+            ]
             db.add_all(accounts)
             db.commit()
             account_ids = [account.id for account in accounts]
@@ -85,7 +95,9 @@ def postgres_api():
         app.dependency_overrides[get_db] = override_get_db
         with TestClient(app) as client:
             yield PostgresAPI(
-                client=client, engine=engine, sessions=sessions,
+                client=client,
+                engine=engine,
+                sessions=sessions,
                 account_ids=account_ids,
                 headers={"Authorization": f"Bearer {token}"},
             )
@@ -95,9 +107,13 @@ def postgres_api():
         if engine is not None:
             engine.dispose()
         with admin.begin() as connection:
-            connection.execute(DropSchema(
-                schema, cascade=True, if_exists=True,
-            ))
+            connection.execute(
+                DropSchema(
+                    schema,
+                    cascade=True,
+                    if_exists=True,
+                )
+            )
         admin.dispose()
 
 
@@ -147,9 +163,7 @@ def post_parallel(api, monkeypatch, requests, *, same_account=True):
             assert release_lock.wait(10), "Coordinator did not release lock"
         return account
 
-    monkeypatch.setattr(
-        TransactionService, "get_user_account", lock_account
-    )
+    monkeypatch.setattr(TransactionService, "get_user_account", lock_account)
 
     def post(request):
         account_id, amount, key = request
@@ -157,8 +171,10 @@ def post_parallel(api, monkeypatch, requests, *, same_account=True):
             "/api/v1/transactions/",
             headers={**api.headers, "Idempotency-Key": key},
             json={
-                "account_id": account_id, "type": "expense",
-                "amount": amount, "currency": "USD",
+                "account_id": account_id,
+                "type": "expense",
+                "amount": amount,
+                "currency": "USD",
             },
         )
 
@@ -171,15 +187,19 @@ def post_parallel(api, monkeypatch, requests, *, same_account=True):
                 deadline = time.monotonic() + 5
                 with api.engine.connect() as connection:
                     while True:
-                        blocked = connection.scalar(text(
-                            "SELECT EXISTS (SELECT 1 FROM pg_stat_activity "
-                            "WHERE :holder = ANY(pg_blocking_pids(pid)))"
-                        ), {"holder": holder[0]})
+                        blocked = connection.scalar(
+                            text(
+                                "SELECT EXISTS "
+                                "(SELECT 1 FROM pg_stat_activity "
+                                "WHERE :holder = ANY(pg_blocking_pids(pid)))"
+                            ),
+                            {"holder": holder[0]},
+                        )
                         if blocked:
                             break
-                        assert time.monotonic() < deadline, (
-                            "Second request did not wait for the account lock"
-                        )
+                        assert (
+                            time.monotonic() < deadline
+                        ), "Second request did not wait for the account lock"
                         time.sleep(0.01)
         finally:
             release_lock.set()
@@ -194,15 +214,23 @@ def post_parallel(api, monkeypatch, requests, *, same_account=True):
     ],
 )
 def test_simultaneous_expenses_preserve_balance(
-    postgres_api, monkeypatch, amounts, expected_statuses,
-    expected_balance, expected_count,
+    postgres_api,
+    monkeypatch,
+    amounts,
+    expected_statuses,
+    expected_balance,
+    expected_count,
 ):
     api = postgres_api
     account_id = api.account_ids[0]
-    responses = post_parallel(api, monkeypatch, [
-        (account_id, amount, f"expense-{i}")
-        for i, amount in enumerate(amounts)
-    ])
+    responses = post_parallel(
+        api,
+        monkeypatch,
+        [
+            (account_id, amount, f"expense-{i}")
+            for i, amount in enumerate(amounts)
+        ],
+    )
     assert sorted(r.status_code for r in responses) == expected_statuses
     for response in responses:
         if response.status_code == 400:
@@ -219,14 +247,19 @@ def test_simultaneous_expenses_preserve_balance(
 
 
 def test_simultaneous_same_key_replays_even_if_balance_is_now_insufficient(
-    postgres_api, monkeypatch,
+    postgres_api,
+    monkeypatch,
 ):
     api = postgres_api
     account_id = api.account_ids[0]
-    responses = post_parallel(api, monkeypatch, [
-        (account_id, "80.00", "same-key"),
-        (account_id, "80.00", "same-key"),
-    ])
+    responses = post_parallel(
+        api,
+        monkeypatch,
+        [
+            (account_id, "80.00", "same-key"),
+            (account_id, "80.00", "same-key"),
+        ],
+    )
     assert sorted(r.status_code for r in responses) == [200, 201]
     assert responses[0].json() == responses[1].json()
     with api.sessions() as db:
@@ -236,14 +269,21 @@ def test_simultaneous_same_key_replays_even_if_balance_is_now_insufficient(
 
 @pytest.mark.parametrize("same_account", [True, False])
 def test_simultaneous_same_key_with_different_payload_is_conflict(
-    postgres_api, monkeypatch, same_account,
+    postgres_api,
+    monkeypatch,
+    same_account,
 ):
     api = postgres_api
     first_id, second_id = api.account_ids
-    responses = post_parallel(api, monkeypatch, [
-        (first_id, "80.00", "same-key"),
-        (first_id if same_account else second_id, "70.00", "same-key"),
-    ], same_account=same_account)
+    responses = post_parallel(
+        api,
+        monkeypatch,
+        [
+            (first_id, "80.00", "same-key"),
+            (first_id if same_account else second_id, "70.00", "same-key"),
+        ],
+        same_account=same_account,
+    )
     assert sorted(r.status_code for r in responses) == [201, 409]
     conflict = next(r for r in responses if r.status_code == 409)
     assert "different transaction parameters" in conflict.json()["detail"]

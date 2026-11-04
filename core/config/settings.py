@@ -67,7 +67,10 @@ class Settings(BaseSettings):
             "dev-secret-key",
         }
 
-        if (len(self.secret_key) < 32 or self.secret_key.lower() in placeholder_keys):
+        if (
+            len(self.secret_key) < 32
+            or self.secret_key.lower() in placeholder_keys
+        ):
             raise ValueError(
                 "SECRET_KEY must be a strong key of at least 32 characters "
                 "in production"

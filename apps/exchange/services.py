@@ -48,7 +48,7 @@ class ExchangeRateService:
                     "from_currency": from_currency.value,
                     "to_currency": to_currency.value,
                     "updated_at": None,
-                }
+                },
             )
         updated_at = rate.updated_at
         if updated_at is not None:
@@ -227,8 +227,7 @@ class ExchangeRateService:
                 "Frankfurter response is missing required quotes"
             )
         if any(
-            not value.is_finite() or value <= 0
-            for value in eur_rates.values()
+            not value.is_finite() or value <= 0 for value in eur_rates.values()
         ):
             raise RuntimeError("Frankfurter response contains an invalid rate")
         normalized_rates = {
@@ -240,7 +239,7 @@ class ExchangeRateService:
             for target in supported_currencies:
                 if source == target:
                     continue
-                value = (normalized_rates[target] / normalized_rates[source])
+                value = normalized_rates[target] / normalized_rates[source]
                 canonical_rate = value.quantize(
                     Decimal("0.00000001"), rounding=ROUND_HALF_UP
                 )
@@ -266,12 +265,14 @@ class ExchangeRateService:
                 existing_rate.updated_at = refreshed_at
                 updated_count += 1
             else:
-                db.add(ExchangeRate(
-                    from_currency=from_currency,
-                    to_currency=to_currency,
-                    rate=canonical_rate,
-                    updated_at=refreshed_at,
-                ))
+                db.add(
+                    ExchangeRate(
+                        from_currency=from_currency,
+                        to_currency=to_currency,
+                        rate=canonical_rate,
+                        updated_at=refreshed_at,
+                    )
+                )
                 created_count += 1
 
         db.commit()

@@ -1,4 +1,19 @@
 services:
+  validate-config:
+    build:
+      context: .
+      target: runtime
+    env_file:
+      - .env
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        case "$${DEBUG:-}" in
+          [Ff][Aa][Ll][Ss][Ee]) exit 0 ;;
+          *) echo 'Set DEBUG=False in .env before starting production.' >&2; exit 1 ;;
+        esac
+
   api:
     build:
       context: .
@@ -12,12 +27,15 @@ services:
       - .env
     environment:
       - ENV=production
-      - DEBUG=False
       - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
       - REDIS_URL=redis://redis:6379/2
     depends_on:
-      - db
-      - redis
+      validate-config:
+        condition: service_completed_successfully
+      db:
+        condition: service_started
+      redis:
+        condition: service_started
     networks:
       - mcb-network
     healthcheck:
@@ -41,8 +59,12 @@ services:
       - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
       - REDIS_URL=redis://redis:6379/2
     depends_on:
-      - db
-      - redis
+      validate-config:
+        condition: service_completed_successfully
+      db:
+        condition: service_started
+      redis:
+        condition: service_started
     networks:
       - mcb-network
 
@@ -59,8 +81,12 @@ services:
       - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
       - REDIS_URL=redis://redis:6379/2
     depends_on:
-      - db
-      - redis
+      validate-config:
+        condition: service_completed_successfully
+      db:
+        condition: service_started
+      redis:
+        condition: service_started
     networks:
       - mcb-network
 

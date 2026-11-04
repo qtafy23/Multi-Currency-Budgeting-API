@@ -105,15 +105,20 @@ def test_create_transaction_rejects_insufficient_balance(db_session):
 def test_key_is_shared_between_accounts_of_one_user(db_session):
     user, first_account = _create_user_and_account(db_session)
     second_account = Account(
-        user_id=user.id, name="Second", balance=Decimal("100.00"),
-        currency="USD", is_active=True,
+        user_id=user.id,
+        name="Second",
+        balance=Decimal("100.00"),
+        currency="USD",
+        is_active=True,
     )
     db_session.add(second_account)
     db_session.flush()
     for account in [first_account, second_account]:
         payload = TransactionCreate(
-            account_id=account.id, type=TransactionType.EXPENSE,
-            amount=Decimal("10.00"), currency=Currency.USD,
+            account_id=account.id,
+            type=TransactionType.EXPENSE,
+            amount=Decimal("10.00"),
+            currency=Currency.USD,
         )
         if account is first_account:
             TransactionService.create_transaction(
@@ -133,14 +138,20 @@ def test_key_is_shared_between_accounts_of_one_user(db_session):
 def test_database_rejects_duplicate_key_for_user_across_accounts(db_session):
     user, account = _create_user_and_account(db_session)
     second_account = Account(
-        user_id=user.id, name="Second", currency="USD", balance=0,
+        user_id=user.id,
+        name="Second",
+        currency="USD",
+        balance=0,
     )
     db_session.add(second_account)
     db_session.commit()
     values = dict(
-        user_id=user.id, idempotency_key="duplicate",
-        type=TransactionType.INCOME, amount=Decimal("1.00"),
-        balance_after=Decimal("1.00"), currency="USD",
+        user_id=user.id,
+        idempotency_key="duplicate",
+        type=TransactionType.INCOME,
+        amount=Decimal("1.00"),
+        balance_after=Decimal("1.00"),
+        currency="USD",
     )
     db_session.add(Transaction(account_id=account.id, **values))
     db_session.commit()
@@ -154,8 +165,10 @@ def test_database_rejects_duplicate_key_for_user_across_accounts(db_session):
 def test_transactions_without_key_are_not_deduplicated(db_session):
     user, account = _create_user_and_account(db_session)
     payload = TransactionCreate(
-        account_id=account.id, type=TransactionType.EXPENSE,
-        amount=Decimal("10.00"), currency=Currency.USD,
+        account_id=account.id,
+        type=TransactionType.EXPENSE,
+        amount=Decimal("10.00"),
+        currency=Currency.USD,
     )
     for _ in range(2):
         _, created = TransactionService.create_transaction(
@@ -170,8 +183,10 @@ def test_transactions_without_key_are_not_deduplicated(db_session):
 def test_same_key_with_changed_payload_does_not_change_balance(db_session):
     user, account = _create_user_and_account(db_session)
     payload = TransactionCreate(
-        account_id=account.id, type=TransactionType.EXPENSE,
-        amount=Decimal("10.00"), currency=Currency.USD,
+        account_id=account.id,
+        type=TransactionType.EXPENSE,
+        amount=Decimal("10.00"),
+        currency=Currency.USD,
     )
     TransactionService.create_transaction(
         db_session, payload, user.id, "shared-key"
@@ -190,9 +205,10 @@ def test_api_accepts_same_key_for_different_authenticated_users(client):
     transaction_ids = []
     for email in ["api-alice@example.com", "api-bob@example.com"]:
         credentials = {"email": email, "password": "secret123"}
-        assert client.post(
-            "/api/v1/auth/register", json=credentials
-        ).status_code == 201
+        assert (
+            client.post("/api/v1/auth/register", json=credentials).status_code
+            == 201
+        )
         login = client.post("/api/v1/auth/login", data=credentials)
         assert login.status_code == 200, login.text
         headers = {
@@ -201,12 +217,15 @@ def test_api_accepts_same_key_for_different_authenticated_users(client):
         }
         account = client.post(
             "/api/v1/accounts/create",
-            json={"name": "Main", "currency": "USD"}, headers=headers,
+            json={"name": "Main", "currency": "USD"},
+            headers=headers,
         )
         assert account.status_code == 201, account.text
         payload = {
-            "account_id": account.json()["id"], "type": "income",
-            "amount": "10.00", "currency": "USD",
+            "account_id": account.json()["id"],
+            "type": "income",
+            "amount": "10.00",
+            "currency": "USD",
         }
         first = client.post(
             "/api/v1/transactions/", json=payload, headers=headers

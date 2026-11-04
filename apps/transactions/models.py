@@ -38,11 +38,12 @@ class Transaction(Base):
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
-            UniqueConstraint(
-              "user_id", "idempotency_key",
-              name="uq_transactions_user_id_idempotency_key",
-            ),
-        )
+        UniqueConstraint(
+            "user_id",
+            "idempotency_key",
+            name="uq_transactions_user_id_idempotency_key",
+        ),
+    )
 
     def __repr__(self) -> str:
         return (

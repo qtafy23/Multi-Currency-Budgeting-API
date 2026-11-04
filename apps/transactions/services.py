@@ -130,9 +130,7 @@ class TransactionService:
         )
 
         if existing:
-            TransactionService.validate_idempotent_request(
-                existing, payload
-            )
+            TransactionService.validate_idempotent_request(existing, payload)
             logger.debug(
                 "Idempotency hit: user_id=%s idempotency_key=%s",
                 user_id,

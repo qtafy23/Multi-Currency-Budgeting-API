@@ -1,1 +1,1 @@
-from .db import *   # noqa
+from .db import *  # noqa

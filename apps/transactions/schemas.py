@@ -20,7 +20,7 @@ class TransactionCreate(BaseModel):
         gt=0,
         max_digits=12,
         decimal_places=2,
-        description="Transaction amount"
+        description="Transaction amount",
     )
     currency: Currency = Field(
         ..., description="Currency code for the incoming transaction"

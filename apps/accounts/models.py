@@ -1,4 +1,5 @@
 from sqlalchemy import (
+    JSON,
     Boolean,
     Column,
     DateTime,
@@ -6,7 +7,6 @@ from sqlalchemy import (
     Integer,
     Numeric,
     String,
-    JSON,
 )
 from sqlalchemy.sql import func
 
@@ -51,4 +51,3 @@ class AccountEvent(Base):
         nullable=False,
         server_default=func.now(),
     )
-

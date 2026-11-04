@@ -45,9 +45,7 @@ class BudgetUpdate(BaseModel):
     )
 
     class Config:
-        json_schema_extra = {
-            "example": {"limit": 600.00, "currency": "USD"}
-        }
+        json_schema_extra = {"example": {"limit": 600.00, "currency": "USD"}}
 
 
 class BudgetResponse(BaseModel):
