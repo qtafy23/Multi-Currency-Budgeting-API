@@ -1,0 +1,118 @@
+services:
+  validate-config:
+    build:
+      context: .
+      target: runtime
+    env_file:
+      - .env
+    command:
+      - /bin/sh
+      - -ec
+      - |
+        case "$${DEBUG:-}" in
+          [Ff][Aa][Ll][Ss][Ee]) exit 0 ;;
+          *) echo 'Set DEBUG=False in .env before starting production.' >&2; exit 1 ;;
+        esac
+
+  api:
+    build:
+      context: .
+      target: runtime
+    container_name: mcb-api-prod
+    restart: always
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - ENV=production
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
+      - REDIS_URL=redis://redis:6379/2
+    depends_on:
+      validate-config:
+        condition: service_completed_successfully
+      db:
+        condition: service_started
+      redis:
+        condition: service_started
+    networks:
+      - mcb-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  worker:
+    build:
+      context: .
+      target: runtime
+    container_name: mcb-celery-worker-prod
+    restart: always
+    command: celery -A core.celery_app worker --loglevel=info
+    env_file:
+      - .env
+    environment:
+      - ENV=production
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
+      - REDIS_URL=redis://redis:6379/2
+    depends_on:
+      validate-config:
+        condition: service_completed_successfully
+      db:
+        condition: service_started
+      redis:
+        condition: service_started
+    networks:
+      - mcb-network
+
+  beat:
+    build:
+      context: .
+      target: runtime
+    container_name: mcb-celery-beat-prod
+    command: celery -A core.celery_app beat --loglevel=info
+    env_file:
+      - .env
+    environment:
+      - ENV=production
+      - DATABASE_URL=postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
+      - REDIS_URL=redis://redis:6379/2
+    depends_on:
+      validate-config:
+        condition: service_completed_successfully
+      db:
+        condition: service_started
+      redis:
+        condition: service_started
+    networks:
+      - mcb-network
+
+  db:
+    image: postgres:16-alpine
+    container_name: mcb-db-prod
+    restart: always
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=${DB_NAME}
+    volumes:
+      - postgres_prod:/var/lib/postgresql/data
+    networks:
+      - mcb-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: mcb-redis-prod
+    restart: always
+    networks:
+      - mcb-network
+
+volumes:
+  postgres_prod:
+
+networks:
+  mcb-network:
+    driver: bridge
